@@ -257,7 +257,7 @@ exports.socketInitialize = function (httpServer) {
                                 } else {
                                     console.log("66666")
                                     // expire check
-                                    job.checkIfChannelExpired(data.channel_name, function (err, is_expired) {
+                                    job.checkIfChannelExpired(data.channel_name, data.type, function (err, is_expired) {
                                         if (err) {
                                             console.log("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq")
                                             videoCallState = null;
@@ -285,7 +285,7 @@ exports.socketInitialize = function (httpServer) {
                                                     videoCallState = data.videoCallState;
                                                     // emit event call send/receive....
                                                     // query to get the receiver details..
-                                                    job.getReceiverDetails(receiver_id, function (err, getData) {
+                                                    job.getReceiverDetails(receiver_id, data.type, function (err, getData) {
                                                         let receiver_details = err ? null : getData.details;
                                                         if (!!receiver_details) {
                                                             console.log(receiver_details, "receiver_details...")
@@ -321,7 +321,98 @@ exports.socketInitialize = function (httpServer) {
                         }
                     }
                 });
-            } else {
+            } else if(data.type === 1)
+            {
+                var sqlUserAuth = "SELECT * FROM `likes` where user_id = ? and liked_user_id = ? and accept = 1 or liked_user_id = ? and user_id = ? and accept = 1";
+                var test = connection.query(sqlUserAuth, [sender_id, receiver_id, sender_id, receiver_id], function (error, user) {
+                    if (error) {
+                        console.log(error, "11111")
+                        socketIO.emit("unauthorize_video_call", {user_from_id: sender_id, user_to_id: receiver_id});
+                    } else {
+                        console.log(test, "test query....")
+                        if (user.length > 0) {
+                            console.log("77777")
+                            var sqlChannelAuth = "SELECT * FROM `audio_call` where channel_name = ? and call_status = 0";
+                            const query = connection.query(sqlChannelAuth, [data.channel_name], function (error, channel) {
+                                if (error) {
+                                    console.log("55555")
+                                    // add query to change the status..... 3
+                                    job.changeVideoCallStatus(3, data.channel_name, function (err, getData) {
+                                        socketIO.emit("unauthorize_video_call", {
+                                            user_from_id: sender_id,
+                                            user_to_id: receiver_id
+                                        });
+                                    })
+                                } else {
+                                    console.log("66666")
+                                    // expire check
+                                    job.checkIfChannelExpired(data.channel_name, data.type, function (err, is_expired) {
+                                        if (err) {
+                                            console.log("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq")
+                                            videoCallState = null;
+                                            socketIO.emit("unauthorize_video_call", {
+                                                user_from_id: sender_id,
+                                                user_to_id: receiver_id
+                                            });
+                                        } else {
+                                            if (is_expired) {
+                                                console.log("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")
+                                                videoCallState = null;
+                                                // add query to change the status..... 3
+                                                job.changeVideoCallStatus(3, data.channel_name, function (err, getData) {
+                                                    socketIO.emit("unauthorize_video_call", {
+                                                        user_from_id: sender_id,
+                                                        user_to_id: receiver_id
+                                                    });
+                                                })
+                                            } else {
+                                                console.log("not expired....");
+
+                                                console.log(data.videoCallState, "checking state...")
+                                                if (data.videoCallState !== null) {
+                                                    console.log("sender found...")
+                                                    videoCallState = data.videoCallState;
+                                                    // emit event call send/receive....
+                                                    // query to get the receiver details..
+                                                    job.getReceiverDetails(receiver_id, data.type, function (err, getData) {
+                                                        let receiver_details = err ? null : getData.details;
+                                                        if (!!receiver_details) {
+                                                            console.log(receiver_details, "receiver_details...")
+                                                            setInterval(intervalFunc, 1000);
+                                                            socketIO.emit("pick_video_call",
+                                                                Object.assign(receiver_details, {
+                                                                    user_from_id: sender_id,
+                                                                    user_to_id: receiver_id,
+                                                                    link: "/true/" + sender_id + "/" + receiver_id + "/" + videoCallState.channel_id + "/" + videoCallState.channel_name + "/audio-chat",
+                                                                    channel_name: videoCallState.channel_name
+                                                                })
+                                                            )
+                                                        }
+                                                    })
+                                                } else {
+                                                    console.log("receiver found...")
+                                                }
+                                                console.log(videoCallState, "videoCallState...")
+                                                socketIO.emit("authorize_video_call", {
+                                                    user_from_id: sender_id,
+                                                    user_to_id: receiver_id,
+                                                    videoCallState
+                                                });
+                                            }
+                                        }
+                                    })
+                                }
+                            })
+                        } else {
+                            console.log("333333")
+                            // unauthorized...
+                            socketIO.emit("unauthorize_video_call", {user_from_id: sender_id, user_to_id: receiver_id});
+                        }
+                    }
+                });
+            }
+            
+            else {
                 console.log("22222")
                 // add query to change the status..... 3
                 socketIO.emit("unauthorize_video_call", {user_from_id: sender_id, user_to_id: receiver_id});

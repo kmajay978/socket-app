@@ -33,12 +33,13 @@ exports.getMessage=function(data,user2_id,callback) {
     });
 }
 
-exports.checkIfChannelExpired=function(channel, callback) {
+exports.checkIfChannelExpired=function(channel, callback, type) {
     async.waterfall([
         function (cb) {
             let startTime = null;
-            var sqlGetVideoCallCreateTime = "SELECT * FROM `video_call` where channel_name = ?";
-            const query = connection.query(sqlGetVideoCallCreateTime, [channel], function(error, callStartTime) {
+            const db_table = type ? 'audio_call' : 'video_call';
+            var sqlGetVideoCallCreateTime = "SELECT * FROM ? where channel_name = ?";
+            const query = connection.query(sqlGetVideoCallCreateTime, [db_table, channel], function(error, callStartTime) {
                 if (error) {
                     console.log("can't get start time of video call...", error)
                 }
@@ -67,12 +68,13 @@ exports.checkIfChannelExpired=function(channel, callback) {
     });
 }
 
-exports.changeVideoCallStatus=function(status, channel, callback) {
+exports.changeVideoCallStatus=function(status, channel, type, callback) {
     async.waterfall([
         function (cb) {
         console.log(status, channel, "lklklklklklklklklklklklklklklk")
-            var sqlVideoCallStatus = "UPDATE video_call SET call_status = ? WHERE channel_name = ?";
-            const query = connection.query(sqlVideoCallStatus, [status, channel], function(error, user) {
+            const db_table = type ? 'audio_call' : 'video_call';
+            var sqlVideoCallStatus = "UPDATE ?  SET call_status = ? WHERE channel_name = ?";
+            const query = connection.query(sqlVideoCallStatus, [db_table, status, channel], function(error, user) {
                 if (error) {
                     console.log("can't change status", error);
                 }
@@ -308,11 +310,12 @@ exports.getReceiverDetails = function(receiver_id, callback) {
     });
 }
 
-exports.checkIfCallReceived = function(channel, callback) {
+exports.checkIfCallReceived = function(channel, type, callback) {
     async.waterfall([
         function (cb) {
-            var sqlVideoCallStatus = "SELECT * FROM `video_call` where channel_name = ?";
-            const query = connection.query(sqlVideoCallStatus, [channel], function(error, call) {
+            const db_table = type ? 'audio_call' : 'video_call';
+            var sqlVideoCallStatus = "SELECT * FROM ? where channel_name = ?";
+            const query = connection.query(sqlVideoCallStatus, [db_table, channel], function(error, call) {
                 if (error) {
                     console.log("can't change status", error);
                 }
