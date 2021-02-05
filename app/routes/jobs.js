@@ -33,13 +33,12 @@ exports.getMessage=function(data,user2_id,callback) {
     });
 }
 
-exports.checkIfChannelExpired=function(channel, callback, type) {
+exports.checkIfChannelExpired=function(channel, type, callback) {
     async.waterfall([
         function (cb) {
             let startTime = null;
-            const db_table = type ? 'audio_call' : 'video_call';
-            var sqlGetVideoCallCreateTime = "SELECT * FROM ? where channel_name = ?";
-            const query = connection.query(sqlGetVideoCallCreateTime, [db_table, channel], function(error, callStartTime) {
+            var sqlGetVideoCallCreateTime = type ? "SELECT * FROM audio_call where channel_name = ?" : 'SELECT * FROM video_call where channel_name = ?'; ;
+            const query = connection.query(sqlGetVideoCallCreateTime, [channel], function(error, callStartTime) {
                 if (error) {
                     console.log("can't get start time of video call...", error)
                 }
@@ -72,9 +71,8 @@ exports.changeVideoCallStatus=function(status, channel, type, callback) {
     async.waterfall([
         function (cb) {
         console.log(status, channel, "lklklklklklklklklklklklklklklk")
-            const db_table = type ? 'audio_call' : 'video_call';
-            var sqlVideoCallStatus = "UPDATE ?  SET call_status = ? WHERE channel_name = ?";
-            const query = connection.query(sqlVideoCallStatus, [db_table, status, channel], function(error, user) {
+            var sqlVideoCallStatus = type ? "UPDATE audio_call SET call_status = ? WHERE channel_name = ?" : "UPDATE video_call SET call_status = ? WHERE channel_name = ?";
+            const query = connection.query(sqlVideoCallStatus, [status, channel], function(error, user) {
                 if (error) {
                     console.log("can't change status", error);
                 }
@@ -291,7 +289,7 @@ exports.checkIfHostIsLive=function(channel_name, user_id, callback) {
     });
 }
 
-exports.getReceiverDetails = function(receiver_id, callback) {
+exports.getReceiverDetails = function(receiver_id, type, callback) {
     async.waterfall([
         function (cb) {
             var sqlGetReceiverDetails = "SELECT firstName,lastName,profilePics, occupation, DATE_FORMAT(NOW(), '%Y') - DATE_FORMAT(dob, '%Y') - (DATE_FORMAT(NOW(), '00-%m-%d') < DATE_FORMAT(dob, '00-%m-%d')) AS age  from users where id = ?";
@@ -313,9 +311,8 @@ exports.getReceiverDetails = function(receiver_id, callback) {
 exports.checkIfCallReceived = function(channel, type, callback) {
     async.waterfall([
         function (cb) {
-            const db_table = type ? 'audio_call' : 'video_call';
-            var sqlVideoCallStatus = "SELECT * FROM ? where channel_name = ?";
-            const query = connection.query(sqlVideoCallStatus, [db_table, channel], function(error, call) {
+            var sqlVideoCallStatus = type ? "SELECT * FROM audio_call where channel_name = ?" : "SELECT * FROM video_call where channel_name = ?";
+            const query = connection.query(sqlVideoCallStatus, [channel], function(error, call) {
                 if (error) {
                     console.log("can't change status", error);
                 }

@@ -162,7 +162,7 @@ exports.socketInitialize = function (httpServer) {
 
         /* --- video call sockets --- */
 
-        function intervalFunc() {
+        function intervalFunc(type) {
             videoCallSendTimeCount++;
             console.log(videoCallSendTimeCount, "counter...")
             const channel = videoCallState.channel_name
@@ -170,7 +170,7 @@ exports.socketInitialize = function (httpServer) {
             if (!!channel) {
                 if (videoCallSendTimeCount > 29) {
                     // query to check if the status ===0 or not...
-                    job.checkIfCallReceived(channel, function (err, data) {
+                    job.checkIfCallReceived(channel, type, function (err, data) {
                         if (err) {
                             console.log("<<checkIfCallReceived >> error", err)
                             videoCallSendTimeCount = 0;
@@ -179,7 +179,7 @@ exports.socketInitialize = function (httpServer) {
                             const status = data.status;
                             console.log(status, "status...")
                             if (status == 0) { // not accepted
-                                job.changeVideoCallStatus(5, channel, function (err, getData) { // change status to 5
+                                job.changeVideoCallStatus(5, channel, type, function (err, getData) { // change status to 5
                                     if (err) {
                                         console.log("couldn't change the status..")
                                     } else {
@@ -196,7 +196,7 @@ exports.socketInitialize = function (httpServer) {
                         }
                     })
                 } else {
-                    job.checkIfCallReceived(channel, function (err, data) {
+                    job.checkIfCallReceived(channel, type, function (err, data) {
                         if (err) {
                             console.log("<<checkIfCallReceived >> error before 61 seconds...", err)
                             videoCallSendTimeCount = 0
@@ -233,6 +233,7 @@ exports.socketInitialize = function (httpServer) {
             // type: 0,1,2
             const sender_id = data.sender.user_from_id;
             const receiver_id = data.reciever_id;
+            console.log(data.type, "909090099090909090909099009090")
             if (data.type === 0) {
                 var sqlUserAuth = "SELECT * FROM `likes` where user_id = ? and liked_user_id = ? and accept = 1 or liked_user_id = ? and user_id = ? and accept = 1";
                 var test = connection.query(sqlUserAuth, [sender_id, receiver_id, sender_id, receiver_id], function (error, user) {
@@ -248,7 +249,7 @@ exports.socketInitialize = function (httpServer) {
                                 if (error) {
                                     console.log("55555")
                                     // add query to change the status..... 3
-                                    job.changeVideoCallStatus(3, data.channel_name, function (err, getData) {
+                                    job.changeVideoCallStatus(3, data.channel_name, data.type, function (err, getData) {
                                         socketIO.emit("unauthorize_video_call", {
                                             user_from_id: sender_id,
                                             user_to_id: receiver_id
@@ -270,7 +271,7 @@ exports.socketInitialize = function (httpServer) {
                                                 console.log("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")
                                                 videoCallState = null;
                                                 // add query to change the status..... 3
-                                                job.changeVideoCallStatus(3, data.channel_name, function (err, getData) {
+                                                job.changeVideoCallStatus(3, data.channel_name, data.type, function (err, getData) {
                                                     socketIO.emit("unauthorize_video_call", {
                                                         user_from_id: sender_id,
                                                         user_to_id: receiver_id
@@ -289,7 +290,8 @@ exports.socketInitialize = function (httpServer) {
                                                         let receiver_details = err ? null : getData.details;
                                                         if (!!receiver_details) {
                                                             console.log(receiver_details, "receiver_details...")
-                                                            setInterval(intervalFunc, 1000);
+
+                                                            setInterval( function() { intervalFunc(data.type); }, 1000 );
                                                             socketIO.emit("pick_video_call",
                                                                 Object.assign(receiver_details, {
                                                                     user_from_id: sender_id,
@@ -337,7 +339,7 @@ exports.socketInitialize = function (httpServer) {
                                 if (error) {
                                     console.log("55555")
                                     // add query to change the status..... 3
-                                    job.changeVideoCallStatus(3, data.channel_name, function (err, getData) {
+                                    job.changeVideoCallStatus(3, data.channel_name, data.type, function (err, getData) {
                                         socketIO.emit("unauthorize_video_call", {
                                             user_from_id: sender_id,
                                             user_to_id: receiver_id
@@ -359,7 +361,7 @@ exports.socketInitialize = function (httpServer) {
                                                 console.log("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")
                                                 videoCallState = null;
                                                 // add query to change the status..... 3
-                                                job.changeVideoCallStatus(3, data.channel_name, function (err, getData) {
+                                                job.changeVideoCallStatus(3, data.channel_name, data.type, function (err, getData) {
                                                     socketIO.emit("unauthorize_video_call", {
                                                         user_from_id: sender_id,
                                                         user_to_id: receiver_id
@@ -378,7 +380,7 @@ exports.socketInitialize = function (httpServer) {
                                                         let receiver_details = err ? null : getData.details;
                                                         if (!!receiver_details) {
                                                             console.log(receiver_details, "receiver_details...")
-                                                            setInterval(intervalFunc, 1000);
+                                                            setInterval( function() { intervalFunc(data.type); }, 1000 );
                                                             socketIO.emit("pick_video_call",
                                                                 Object.assign(receiver_details, {
                                                                     user_from_id: sender_id,
@@ -429,7 +431,7 @@ exports.socketInitialize = function (httpServer) {
 
             // add query to change the status..... 3
             console.log(data.status, data.channel_name, "klklklklklklklklklklklklklklklklklklklklkl")
-            job.changeVideoCallStatus(data.status, data.channel_name, function (err, getData) {
+            job.changeVideoCallStatus(data.status, data.channel_name, data.type, function (err, getData) {
                 socketIO.emit("unauthorize_video_call", {
                     user_from_id: data.sender.user_from_id,
                     user_to_id: data.reciever_id
@@ -443,7 +445,7 @@ exports.socketInitialize = function (httpServer) {
             //     channel_name: videoCallState.channel_name
             //     type: 0,
             //     status: 1
-            job.changeVideoCallStatus(data.status, data.channel_name, function (err, getData) {
+            job.changeVideoCallStatus(data.status, data.channel_name, data.type, function (err, getData) {
                 console.log("acknowledged_video_call...")
             })
             // add query to change the status..... 1
@@ -487,7 +489,7 @@ exports.socketInitialize = function (httpServer) {
             //     channel_name: receiverDetails.channel_name,
             //     type: 0,
             //     status: 2
-            job.changeVideoCallStatus(data.status, data.channel_name, function (err, getData) {
+            job.changeVideoCallStatus(data.status, data.channel_name, data.type, function (err, getData) {
                 if (err) {
                     console.log("something went wrong..")
                 } else {
@@ -505,7 +507,7 @@ exports.socketInitialize = function (httpServer) {
             //     channel_name: receiverDetails.channel_name,
             //     type: 0,
             //     status: 2
-            job.changeVideoCallStatus(data.status, data.channel_name, function (err, getData) {
+            job.changeVideoCallStatus(data.status, data.channel_name, data.type, function (err, getData) {
                 if (err) {
                     console.log("something went wrong..")
                 } else {
