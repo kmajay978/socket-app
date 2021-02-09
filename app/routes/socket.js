@@ -10,6 +10,7 @@ var videoCallState;
 var videoCallSendTimeCount = 0;
 var clearFriendListLiveInterval = false;
 var video_live_hosts = [];
+var myInterval;
 
 exports.socketInitialize = function (httpServer) {
     console.log("INNN");
@@ -166,7 +167,6 @@ exports.socketInitialize = function (httpServer) {
             videoCallSendTimeCount++;
             console.log(videoCallSendTimeCount, "counter...")
             const channel = videoCallState.channel_name
-            const interval = this;
             if (!!channel) {
                 if (videoCallSendTimeCount > 29) {
                     // query to check if the status ===0 or not...
@@ -174,10 +174,10 @@ exports.socketInitialize = function (httpServer) {
                         if (err) {
                             console.log("<<checkIfCallReceived >> error", err)
                             videoCallSendTimeCount = 0;
-                            clearInterval(interval);
+                            clearInterval(myInterval);
                         } else {
                             const status = data.status;
-                            console.log(status, "status...")
+                            console.log(status, "status.....")
                             if (status == 0) { // not accepted
                                 job.changeVideoCallStatus(5, channel, type, function (err, getData) { // change status to 5
                                     if (err) {
@@ -190,8 +190,11 @@ exports.socketInitialize = function (httpServer) {
                                         });
                                     }
                                     videoCallSendTimeCount = 0;
-                                    clearInterval(interval);
+                                    clearInterval(myInterval);
                                 })
+                            }
+                        else {
+                            console.log("i am hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
                             }
                         }
                     })
@@ -200,12 +203,12 @@ exports.socketInitialize = function (httpServer) {
                         if (err) {
                             console.log("<<checkIfCallReceived >> error before 61 seconds...", err)
                             videoCallSendTimeCount = 0
-                            clearInterval(interval);
+                            clearInterval(myInterval);
                         } else {
                             const status = data.status;
                             if (status === 1) {
                                 videoCallSendTimeCount = 0
-                                clearInterval(interval);
+                                clearInterval(myInterval);
                             }
                             if (status !== 0 && status !== 1) {
                                 console.log("nooooooooooooooooooooooooooooooooooooooooooooooooooooooooot == 0");
@@ -214,14 +217,14 @@ exports.socketInitialize = function (httpServer) {
                                     user_to_id: videoCallState.user_to_id
                                 });
                                 videoCallSendTimeCount = 0
-                                clearInterval(interval);
+                                clearInterval(myInterval);
                             }
                         }
                     })
                 }
             } else {
                 videoCallSendTimeCount = 0
-                clearInterval(interval);
+                clearInterval(myInterval);
             }
         }
 
@@ -291,7 +294,7 @@ exports.socketInitialize = function (httpServer) {
                                                         if (!!receiver_details) {
                                                             console.log(receiver_details, "receiver_details...")
 
-                                                            setInterval( function() { intervalFunc(data.type); }, 1000 );
+                                                            myInterval = setInterval( function() { intervalFunc(data.type); }, 1000 );
                                                             socketIO.emit("pick_video_call",
                                                                 Object.assign(receiver_details, {
                                                                     user_from_id: sender_id,
@@ -380,7 +383,7 @@ exports.socketInitialize = function (httpServer) {
                                                         let receiver_details = err ? null : getData.details;
                                                         if (!!receiver_details) {
                                                             console.log(receiver_details, "receiver_details...")
-                                                            setInterval( function() { intervalFunc(data.type); }, 1000 );
+                                                            myInterval = setInterval( function() { intervalFunc(data.type); }, 1000 );
                                                             socketIO.emit("pick_video_call",
                                                                 Object.assign(receiver_details, {
                                                                     user_from_id: sender_id,
