@@ -289,16 +289,16 @@ exports.checkIfHostIsLive=function(channel_name, user_id, callback) {
     });
 }
 
-exports.getReceiverDetails = function(receiver_id, type, callback) {
+exports.getReceiverDetails = function(sender_id, receiver_id, type, callback) {
     async.waterfall([
         function (cb) {
-            var sqlGetReceiverDetails = "SELECT firstName,lastName,profilePics, occupation, DATE_FORMAT(NOW(), '%Y') - DATE_FORMAT(dob, '%Y') - (DATE_FORMAT(NOW(), '00-%m-%d') < DATE_FORMAT(dob, '00-%m-%d')) AS age  from users where id = ?";
-            const query = connection.query(sqlGetReceiverDetails, [receiver_id], function(error, details) {
+            var sqlGetReceiverDetails = "SELECT firstName,lastName,profilePics, occupation, DATE_FORMAT(NOW(), '%Y') - DATE_FORMAT(dob, '%Y') - (DATE_FORMAT(NOW(), '00-%m-%d') < DATE_FORMAT(dob, '00-%m-%d')) AS age  from users where id in (?,?)";
+            const query = connection.query(sqlGetReceiverDetails, [sender_id, receiver_id], function(error, details) {
                 if (error) {
                     console.log("can't get receiver id details....", error);
                 }
                 else {
-                    cb(null, {details: details[0]})
+                    cb(null, {details: details})
                 }
             })
         }
@@ -349,6 +349,25 @@ exports.getVideoLiveList = function(callback) {
     });
 }
 
+exports.getUserDetails = function(sender_id, receiver_id, callback) {
+    async.waterfall([
+        function (cb) {
+            var sqlVideoLiveList = "select id , profilePics from users where id in (?,?)";
+            const query = connection.query(sqlVideoLiveList, [sender_id, receiver_id], function(error, list) {
+                if (error) {
+                    console.log("failed fetching the user details list...", error);
+                    cb(null, [])
+                }
+                else {
+                    cb(null, list)
+                }
+            })
+        }
+    ], function (error, result) {
+        //console.log(result);
+        return callback(error, result);
+    });
+}
 
 exports.sendMessage=function(data,callback)
 {
