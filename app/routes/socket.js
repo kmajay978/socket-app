@@ -332,7 +332,7 @@ exports.socketInitialize = function (httpServer) {
                         }
                     }
                 });
-            } else if(data.type === 1)
+            } else if(data.type === 1) 
             {
                 var sqlUserAuth = "SELECT * FROM `likes` where user_id = ? and liked_user_id = ? and accept = 1 or liked_user_id = ? and user_id = ? and accept = 1";
                 var test = connection.query(sqlUserAuth, [sender_id, receiver_id, sender_id, receiver_id], function (error, user) {
