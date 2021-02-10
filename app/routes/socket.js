@@ -17,7 +17,7 @@ exports.socketInitialize = function (httpServer) {
     var socketIO = require('socket.io').listen(httpServer);
     socketIO.on('connection', function (socket) {
         console.log("socket id ", socket.id);
-        socket_id = socket.id;
+        socket_id = socket.id; 
         console.log("Connected users ", usersConnected);
         /*
         * Authenticate user just after socket connection

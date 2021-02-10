@@ -297,7 +297,7 @@ exports.getReceiverDetails = function(receiver_id, type, callback) {
                 if (error) {
                     console.log("can't get receiver id details....", error);
                 }
-                else {
+                else { 
                     cb(null, {details: details[0]}) 
                 }
             })
