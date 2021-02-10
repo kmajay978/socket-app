@@ -3,9 +3,7 @@ var job = require('./jobs');
 var socket_id = null;
 var usersConnected = {};
 var videoCallState;
-var videoCallSendTimeCount = 0;
 var video_live_hosts = [];
-var myInterval;
 
 exports.socketInitialize = function (httpServer) {
     console.log("INNN");
@@ -158,18 +156,23 @@ exports.socketInitialize = function (httpServer) {
 
         /* --- video call sockets --- */
 
-        function intervalFunc(type) {
-            videoCallSendTimeCount++;
-            console.log(videoCallSendTimeCount, "counter...")
-            const channel = videoCallState.channel_name
+        socket.on('check_pick_video_call_status', function (resp) {
+            const user_from_id = resp.user_from_id;
+            const user_to_id = resp.user_to_id;
+            const type = resp.type;
+            const channel = resp.channel_name;
+            const videoCallSendTimeCount = resp.pickVideoCallCount;
+            console.log(channel, videoCallSendTimeCount + " counter...")
             if (!!channel) {
                 if (videoCallSendTimeCount > 29) {
                     // query to check if the status ===0 or not...
                     job.checkIfCallReceived(channel, type, function (err, data) {
                         if (err) {
                             console.log("<<checkIfCallReceived >> error", err)
-                            videoCallSendTimeCount = 0;
-                            clearInterval(myInterval);
+                            socketIO.emit("stop_pick_video_call_status", {
+                                user_from_id,
+                                user_to_id
+                            });
                         } else {
                             const status = data.status;
                             console.log(status, "status.....")
@@ -184,8 +187,10 @@ exports.socketInitialize = function (httpServer) {
                                             user_to_id: videoCallState.user_to_id
                                         });
                                     }
-                                    videoCallSendTimeCount = 0;
-                                    clearInterval(myInterval);
+                                    socketIO.emit("stop_pick_video_call_status", {
+                                        user_from_id,
+                                        user_to_id
+                                    });
                                 })
                             }
                         else {
@@ -197,13 +202,17 @@ exports.socketInitialize = function (httpServer) {
                     job.checkIfCallReceived(channel, type, function (err, data) {
                         if (err) {
                             console.log("<<checkIfCallReceived >> error before 61 seconds...", err)
-                            videoCallSendTimeCount = 0
-                            clearInterval(myInterval);
+                            socketIO.emit("stop_pick_video_call_status", {
+                                user_from_id,
+                                user_to_id
+                            });
                         } else {
                             const status = data.status;
                             if (status === 1) {
-                                videoCallSendTimeCount = 0
-                                clearInterval(myInterval);
+                                socketIO.emit("stop_pick_video_call_status", {
+                                    user_from_id,
+                                    user_to_id
+                                });
                             }
                             if (status !== 0 && status !== 1) {
                                 console.log("nooooooooooooooooooooooooooooooooooooooooooooooooooooooooot == 0");
@@ -211,17 +220,21 @@ exports.socketInitialize = function (httpServer) {
                                     user_from_id: videoCallState.user_from_id,
                                     user_to_id: videoCallState.user_to_id
                                 });
-                                videoCallSendTimeCount = 0
-                                clearInterval(myInterval);
+                                socketIO.emit("stop_pick_video_call_status", {
+                                    user_from_id,
+                                    user_to_id
+                                });
                             }
                         }
                     })
                 }
             } else {
-                videoCallSendTimeCount = 0
-                clearInterval(myInterval);
+                socketIO.emit("stop_pick_video_call_status", {
+                    user_from_id,
+                    user_to_id
+                });
             }
-        }
+        })
 
         socket.on('authenticate_video_call', function (data) {
             console.log("authenticate ", data);
@@ -285,22 +298,24 @@ exports.socketInitialize = function (httpServer) {
                                                     // emit event call send/receive....
                                                     // query to get the receiver details..
                                                     job.getReceiverDetails(sender_id, receiver_id, data.type, function (err, getData) {
-                                                        let receiver_details = err ? null : getData.details[0];
-                                                        let sender_details = err ? null : getData.details[1];
+                                                        let receiver_details = err ? null : (receiver_id == getData.details[0].id ? getData.details[0] : getData.details[1]);
+                                                        let sender_details = err ? null : (sender_id == getData.details[0].id ? getData.details[0] : getData.details[1]);
+                                                        console.log(getData, receiver_details, "receiver_details", sender_details, "sender_details")
                                                         if (!!receiver_details) {
                                                             console.log(receiver_details, "receiver_details...")
                                                             console.log(sender_details, "sender_details...")
 
-                                                            myInterval = setInterval( function() { intervalFunc(data.type); }, 1000 );
+                                                            // myInterval = setInterval( function() { intervalFunc(data.type); }, 1000 );
                                                             socketIO.emit("pick_video_call",
                                                                 Object.assign(receiver_details, {
-                                                                    user_from_id: sender_id,
-                                                                    user_to_id: receiver_id,
-                                                                    link: "/true/" + sender_id + "/" + receiver_id + "/" + videoCallState.channel_id + "/" + videoCallState.channel_name + "/video-chat",
-                                                                    channel_name: videoCallState.channel_name,
-                                                                    sender_details
-                                                                }
-                                                            ))
+                                                                        user_from_id: sender_id,
+                                                                        user_to_id: receiver_id,
+                                                                        type: data.type,
+                                                                        link: "/true/" + sender_id + "/" + receiver_id + "/" + videoCallState.channel_id + "/" + videoCallState.channel_name + "/video-chat",
+                                                                        channel_name: videoCallState.channel_name,
+                                                                        sender_details
+                                                                    })
+                                                                )
                                                         }
                                                     })
                                                 } else {
@@ -386,18 +401,20 @@ exports.socketInitialize = function (httpServer) {
                                                     // emit event call send/receive....
                                                     // query to get the receiver details..
                                                     job.getReceiverDetails(sender_id, receiver_id, data.type, function (err, getData) {
-                                                        let receiver_details = err ? null : getData.details[0];
-                                                        let sender_details = err ? null : getData.details[1];
+                                                        let receiver_details = err ? null : (receiver_id == getData.details[0].id ? getData.details[0] : getData.details[1]);
+                                                        let sender_details = err ? null : (sender_id == getData.details[0].id ? getData.details[0] : getData.details[1]);
+                                                        console.log(getData, receiver_details, "receiver_details", sender_details, "sender_details")
                                                         if (!!receiver_details) {
                                                             console.log(receiver_details, "receiver_details...")
                                                             console.log(sender_details, "sender_details...")
 
-                                                            myInterval = setInterval( function() { intervalFunc(data.type); }, 1000 );
+                                                            // myInterval = setInterval( function() { intervalFunc(data.type); }, 1000 );
                                                             socketIO.emit("pick_video_call",
                                                                 Object.assign(receiver_details, {
                                                                         user_from_id: sender_id,
                                                                         user_to_id: receiver_id,
-                                                                        link: "/true/" + sender_id + "/" + receiver_id + "/" + videoCallState.channel_id + "/" + videoCallState.channel_name + "/video-chat",
+                                                                        type: data.type,
+                                                                        link: "/true/" + sender_id + "/" + receiver_id + "/" + videoCallState.channel_id + "/" + videoCallState.channel_name + "/audio-chat",
                                                                         channel_name: videoCallState.channel_name,
                                                                         sender_details
                                                                     })

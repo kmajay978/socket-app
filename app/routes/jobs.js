@@ -292,18 +292,14 @@ exports.checkIfHostIsLive=function(channel_name, user_id, callback) {
 exports.getReceiverDetails = function(sender_id, receiver_id, type, callback) {
     async.waterfall([
         function (cb) {
-            var sqlGetReceiverDetails = "SELECT firstName,lastName,profilePics, occupation, DATE_FORMAT(NOW(), '%Y') - DATE_FORMAT(dob, '%Y') - (DATE_FORMAT(NOW(), '00-%m-%d') < DATE_FORMAT(dob, '00-%m-%d')) AS age  from users where id in (?,?)";
+            var sqlGetReceiverDetails = "SELECT id,firstName,lastName,profilePics, occupation, DATE_FORMAT(NOW(), '%Y') - DATE_FORMAT(dob, '%Y') - (DATE_FORMAT(NOW(), '00-%m-%d') < DATE_FORMAT(dob, '00-%m-%d')) AS age  from users where id in (?,?)";
             const query = connection.query(sqlGetReceiverDetails, [sender_id, receiver_id], function(error, details) {
                 if (error) {
                     console.log("can't get receiver id details....", error);
                 }
-<<<<<<< HEAD
                 else {
 
-=======
-                else { 
->>>>>>> 5689f1d95f4f07a7527b86faadc9e6342e19dc0c
-                    cb(null, {details: details[0]}) 
+                    cb(null, {details}) 
 
                 }
             })
