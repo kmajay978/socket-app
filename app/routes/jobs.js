@@ -469,38 +469,48 @@ exports.manageCoinsTimeViewsLiveVideo=function(data, callback) { // call_type: 1
                     })
         }
     ], function (error, result) {
-      //console.log(result);
+        //console.log(result);
         return callback(error, result);
     });
 }
 
-// exports.manageLiveVideoTime=function(sender_id,callback) {
-//     async.waterfall([
-//         function (cb) {
-//             var sqlCheckUserCoins = "SELECT * FROM `users` WHERE id = ?";
-//             connection.query(sqlCheckUserCoins, [sender_id],(error, data)=> {
-//                 if (error) {
-//                     cb({
-//                         message: constants.responseMessages.ERROR_IN_EXECUTION,
-//                         status: constants.responseFlags.ERROR_IN_EXECUTION,
-//                         response_data: {}
-//                     });
 
-//                 } else {
-//                         let callMake = false;
-//                         if (data[0].coins > 20) {
-//                             callMake = true;
-//                         }
-//                         cb(null, {callMake});
-//                     }
-//             });
-//         }
-//     ], function (error, result) {
-//       //console.log(result);
-//         return callback(error, result);
-//     });
-// }
 
+const checkIfUserSendMessage = (sender_id, reciever_id, callback) => {
+    async.waterfall([
+        function (cb) {
+            var emitMessage = true;
+            var emitLimitMessage = "";
+            
+            // check if the already message
+            var sqlCheckMessageListQuery = 'SELECT * FROM `messages` WHERE (`user_from_id`=' + sender_id + ' AND `user_to_id`=' + reciever_id + ') OR (`user_from_id`=' + reciever_id + ' AND `user_to_id`=' + sender_id + ')';
+            connection.query(sqlCheckMessageListQuery, (error, messages) => {
+                if (error) {
+                    emitMessage = false;
+                    cb(null, {message_list: [], emitMessage, emitLimitMessage})
+                } else {
+                    if (messages.length > 2) {
+                        emitMessage = false
+                        emitLimitMessage = messages.length >=3 ? "You can send upto 3 messages since this user hasn't response back, Chat message limit reached. You will not be able to send messages to this user" : "";
+                        for (let i in messages) {
+                            if (messages[i].user_from_id !== sender_id) {
+                                emitMessage = true
+                                emitLimitMessage = "";
+                            }
+                        }
+                    }
+                    cb(null, {message_list: messages, emitMessage, emitLimitMessage});
+                }
+            })
+        }
+    ], function (error, result) {
+            //console.log(result);
+            return callback(error, result);
+        });
+        }
+
+
+        // getMessage
 exports.checkIfUserHasCoins=function(sender_id,callback) {
     async.waterfall([
         function (cb) {
@@ -527,6 +537,7 @@ exports.checkIfUserHasCoins=function(sender_id,callback) {
         return callback(error, result);
     });
 }
+
 exports.checkIfChannelExpired=function(channel, type, callback) {
     async.waterfall([
         function (cb) {
@@ -648,6 +659,121 @@ exports.makeMeLive=function(data, callback) {
 }
 
 // Gift send image
+// sendGiftToSql
+
+// End gift here
+
+exports.sendMessage=function(data,callback)
+{
+    var reciever_id=data.reciever_id;
+    var sender_id = null;
+    var session_id=data.session_id;
+    var message=data.message;
+     var datetime = moment.utc().format('YYYY-MM-DD HH:mm:ss');
+    async.waterfall([
+        function (cb) {
+          var sql = `SELECT * FROM app_login WHERE session_id = ?`;
+            connection.query(sql, [session_id], (error, user)=> {
+                if (error) {
+                    cb({
+                        message: constants.responseMessages.ERROR_IN_EXECUTION,
+                        status: constants.responseFlags.ERROR_IN_EXECUTION,
+                        response_data: {}
+                    });
+                } else {
+                     cb(null, user);
+                }
+            });
+          },
+          function(user,cb)
+        {
+            if (!user || (user && user.length === 0)) 
+             {
+              //console.log('yes');
+                      return cb({
+                          message: constants.responseMessages.INVALID_ACCESS,
+                          status: constants.responseFlags.INVALID_ACCESS,
+                          driver_payment_response: {}
+                      });
+              }else
+              {
+                //console.log(user);
+                sender_id=user[0]['user_id'];
+                checkIfUserSendMessage(sender_id,reciever_id,function(err,message_data){
+                    if(err)
+                    {
+                        cb(null);
+                    }
+                    else
+                    {
+                        const checkIfUserSend = message_data.emitMessage;
+                        const warningMessage = message_data.emitLimitMessage;
+                        console.log(warningMessage,'warningMessage......')
+                        if(checkIfUserSend)
+                        {
+                  var device_type=user[0]['device_type'];
+                  var sql = "INSERT INTO `messages` (`user_from_id`,`user_to_id`,`message`,`created_at`,`updated_at`, `message_is_read`) VALUES(?,?,?,?,?,?)";
+                    var query=connection.query(sql,[sender_id,reciever_id,message,datetime,datetime, 1], (error, user)=> {
+                        if (error) {
+                          console.log(error);
+                            cb({
+                                message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                response_data: {}
+                            });
+                        } else {
+                           var message_id=user.insertId;
+                           var sql1=`SELECT * FROM messages where user_from_id = ? AND user_to_id = ? ORDER BY id DESC`;
+                            //var sql1=`SELECT * FROM messages where msg_id = ?  ORDER BY id DESC`;
+                              connection.query(sql1,[sender_id,reciever_id], (error, message_data)=> {
+                                if(error)
+                                 {
+                                        console.log(error);
+                                             cb({
+                                            message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                            status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                            response_data: {}
+                                        });
+                                 }else
+                                 {
+                                    //  Checking if error message is not empty
+                                        var obj = {};
+                                        obj['status'] = 200;
+                                        obj['message'] = message_data[0]['message'];
+                                        obj['user_from_id'] = message_data[0]['user_from_id'];
+                                        obj['user_to_id'] = message_data[0]['user_to_id'];
+                                        obj['message_id'] = message_data[0]['id'];
+                                        obj['created_at'] = message_data[0]['created_at'];
+                                        obj['updated_at'] = message_data[0]['updated_at'];
+                                           cb(null,{obj});        
+                                 }
+                              })
+                        }
+                    });
+                }
+                else {
+                    if (!!warningMessage) {
+                        var obj = {};
+                        obj['status'] = 200;
+                        obj['message'] = null;
+                        obj['user_from_id'] = sender_id;
+                        obj['user_to_id'] = reciever_id;
+                        obj['message_id'] = null;
+                        obj['created_at'] = null;
+                        obj['updated_at'] = null;
+                        obj['warningMessage'] = warningMessage
+                           cb(null,{obj});        
+                    }
+                }
+            }
+        });
+    }
+        }
+    ], function (error, result) {
+        return callback(error, result);
+    });
+}
+
 exports.sendGiftToSql = function (data, callback) { // file, filename,
     console.log('data', data);
     var reciever_id = data.reciever_id;
@@ -655,6 +781,7 @@ exports.sendGiftToSql = function (data, callback) { // file, filename,
     var datetime = moment.utc().format('YYYY-MM-DD HH:mm:ss');
     async.waterfall([
         function (cb) {
+            console.log(session_id, "session_id..")
             var sql = `SELECT * FROM app_login WHERE session_id = ?`;
             connection.query(sql, [session_id], (error, user) => {
                 if (error) {
@@ -679,8 +806,21 @@ exports.sendGiftToSql = function (data, callback) { // file, filename,
             } else {
                 //console.log(user);
                 var sender_id = user[0]['user_id'];
+                checkIfUserSendMessage(sender_id,reciever_id,function(err,message_data){
+                    if(err)
+                    {
+                        cb(null);
+                    }
+                    else
+                    {
+                        const checkIfUserSend = message_data.emitMessage;
+                        const warningMessage = message_data.emitLimitMessage;
+                        console.log(message_data,"message_data....");
+                        if(checkIfUserSend)
+                        {
                 var sql = 'INSERT INTO `messages` (`user_from_id`,`user_to_id`,`message`, `media`,`created_at`,`updated_at`, `message_is_read`) VALUES(?,?,?,?,?,?,?)'
                 var query = connection.query(sql, [sender_id, reciever_id, "", data.file, datetime, datetime, 1], (error, user) => {
+                    // Checking message length her
                     if (error) {
                         console.log(error);
                         cb({
@@ -716,12 +856,30 @@ exports.sendGiftToSql = function (data, callback) { // file, filename,
                     }})
                 // console.log(query, "query...")
             }
+            else
+            {
+                if(!!warningMessage)
+                {
+                    var obj = {};
+                    obj['status'] = 200;
+                    obj['message'] = null;
+                    obj['user_from_id'] = sender_id;
+                    obj['user_to_id'] = reciever_id;
+                    obj['message_id'] = null;
+                    obj['created_at'] = null;
+                    obj['updated_at'] = null;
+                    obj['warningMessage'] = warningMessage
+                       cb(null,{obj});       
+                }
+            }
+        }
+    })
+            }
         }
     ], function (error, result) {
         return callback(error, result);
     })
 }
-// End gift here
 
 exports.makeMeAudience=function(data, callback) {
     async.waterfall([
@@ -867,6 +1025,7 @@ exports.getUserDetails = function(sender_id, receiver_id, callback) {
 exports.sendMessage=function(data,callback)
 {
     var reciever_id=data.reciever_id;
+    var sender_id = null;
     var session_id=data.session_id;
     var message=data.message;
      var datetime = moment.utc().format('YYYY-MM-DD HH:mm:ss');
@@ -900,7 +1059,21 @@ exports.sendMessage=function(data,callback)
               }else
               {
                 //console.log(user);
-                  var sender_id=user[0]['user_id'];
+                sender_id=user[0]['user_id'];
+                checkIfUserSendMessage(sender_id,reciever_id,function(err,message_data){
+
+                    if(err)
+                    {
+                        cb(null);
+                    }
+                    else
+                    {
+                        const checkIfUserSend = message_data.emitMessage;
+                        const warningMessage = message_data.emitLimitMessage;
+                        console.log(warningMessage,'warningMessage......')
+                        if(checkIfUserSend)
+                        {
+                        
                   var device_type=user[0]['device_type'];
                   var sql = "INSERT INTO `messages` (`user_from_id`,`user_to_id`,`message`,`created_at`,`updated_at`, `message_is_read`) VALUES(?,?,?,?,?,?)";
                     var query=connection.query(sql,[sender_id,reciever_id,message,datetime,datetime, 1], (error, user)=> {
@@ -930,24 +1103,44 @@ exports.sendMessage=function(data,callback)
 		                                });
                                  }else
                                  {
-                                    var obj = {};
-                                  obj['status'] = 200;
-                                  obj['message'] = message_data[0]['message'];
-                                  obj['user_from_id'] = message_data[0]['user_from_id'];
-                                  obj['user_to_id'] = message_data[0]['user_to_id'];
-                                  obj['message_id'] = message_data[0]['id'];
-                                  obj['created_at'] = message_data[0]['created_at'];
-                                  obj['updated_at'] = message_data[0]['updated_at'];
-                                     cb(null,{obj});
-
-                                              
+                                    //  Checking if error message is not empty
+                                        var obj = {};
+                                        obj['status'] = 200;
+                                        obj['message'] = message_data[0]['message'];
+                                        obj['user_from_id'] = message_data[0]['user_from_id'];
+                                        obj['user_to_id'] = message_data[0]['user_to_id'];
+                                        obj['message_id'] = message_data[0]['id'];
+                                        obj['created_at'] = message_data[0]['created_at'];
+                                        obj['updated_at'] = message_data[0]['updated_at'];
+                                           cb(null,{obj});        
                                  }
                               })
                              
                         }
 
                     });
+
                 }
+                else {
+                    if (!!warningMessage) {
+                       
+                        var obj = {};
+                        obj['status'] = 200;
+                        obj['message'] = null;
+                        obj['user_from_id'] = sender_id;
+                        obj['user_to_id'] = reciever_id;
+                        obj['message_id'] = null;
+                        obj['created_at'] = null;
+                        obj['updated_at'] = null;
+                        obj['warningMessage'] = warningMessage
+                           cb(null,{obj});        
+                    }
+                }
+            }
+        });
+
+    }
+
             
         }
     ], function (error, result) {
@@ -1203,9 +1396,25 @@ exports.sendVoiceToSql = function (data, callback) {
                     status: constants.responseFlags.INVALID_ACCESS,
                     driver_payment_response: {}
                 });
-            } else {
+            } 
+            else {
                 //console.log(user);
                 var sender_id = user[0]['user_id'];
+                checkIfUserSendMessage(sender_id,reciever_id,function(err,message_data){
+
+                    if(err)
+                    {
+                        cb(null);
+                    }
+                    else
+                    {
+                        const checkIfUserSend = message_data.emitMessage;
+                        const warningMessage = message_data.emitLimitMessage;
+                        console.log(message_data,"message_data....");
+                        if(checkIfUserSend)
+                        {
+                   
+                
                 var sql = 'INSERT INTO `messages` (`user_from_id`,`user_to_id`,`message`, `media`, `audio`, `created_at`,`updated_at`, `message_is_read`) VALUES(?,?,?,?,?,?,?,?)'
                 var query = connection.query(sql, [sender_id, reciever_id, "", "", data.blob, datetime, datetime, 1], (error, user) => {
                     if (error) {
@@ -1249,6 +1458,30 @@ exports.sendVoiceToSql = function (data, callback) {
                     }})
 
                 // console.log(query, "query...")
+
+            }
+            else
+            {
+               
+                if(!!warningMessage)
+                {
+                    var obj = {};
+                    obj['status'] = 200;
+                    obj['message'] = null;
+                    obj['media'] =null;
+                    obj['audio'] = null;
+                    obj['user_from_id'] = sender_id;
+                    obj['user_to_id'] = reciever_id;
+                    obj['message_id'] = null;
+                    obj['created_at'] = null;
+                    obj['updated_at'] = null;
+                    obj['warningMessage'] = warningMessage
+                    cb(null, {obj});
+
+                }
+            }
+        }
+    });
             }
         }
     ], function (error, result) {
@@ -1289,6 +1522,21 @@ exports.sendImageToSql = function (data, callback) { // file, filename,
             } else {
                 //console.log(user);
                 var sender_id = user[0]['user_id'];
+                checkIfUserSendMessage(sender_id,reciever_id,function(err,message_data){
+
+                    if(err)
+                    {
+                        cb(null);
+                    }
+                    else
+                    {
+                        const checkIfUserSend = message_data.emitMessage;
+                        const warningMessage = message_data.emitLimitMessage;
+                        console.log(message_data,"message_data....");
+                        if(checkIfUserSend)
+                        {
+                      
+                
                 var sql = 'INSERT INTO `messages` (`user_from_id`,`user_to_id`,`message`, `media`,`created_at`,`updated_at`, `message_is_read`) VALUES(?,?,?,?,?,?,?)'
                 var query = connection.query(sql, [sender_id, reciever_id, "", data.file, datetime, datetime, 1], (error, user) => {
                     if (error) {
@@ -1331,6 +1579,27 @@ exports.sendImageToSql = function (data, callback) { // file, filename,
                     }})
 
                 // console.log(query, "query...")
+
+            }
+            else
+            {
+                if(!!warningMessage)
+                {
+                    var obj = {};
+                    obj['status'] = 200;
+                    obj['message'] = null;
+                    obj['media'] = null;
+                    obj['user_from_id'] =sender_id;
+                    obj['user_to_id'] = reciever_id;
+                    obj['message_id'] = null;
+                    obj['created_at'] = null;
+                    obj['updated_at'] = null;
+                    obj['warningMessage'] = warningMessage
+                    cb(null, {obj});
+                }
+            }
+        }
+    });
             }
         }
     ], function (error, result) {

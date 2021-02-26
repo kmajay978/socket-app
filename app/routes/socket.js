@@ -258,12 +258,6 @@ exports.socketInitialize = function (httpServer) {
                         console.log(test, "test query....")
                         if (user.length > 0) {
                             console.log("77777")
-                            job.checkIfUserHasCoins(sender_id, function (err, coinsData) {
-                                if(err) {
-                                    console.log(err)
-                                } 
-                                else {
-                                    if(coinsData.callMake) {
                             var sqlChannelAuth = "SELECT * FROM `video_call` where channel_name = ? and call_status = 0";
                             const query = connection.query(sqlChannelAuth, [data.channel_name], function (error, channel) {
                                 if (error) {
@@ -348,17 +342,7 @@ exports.socketInitialize = function (httpServer) {
                                         }
                                     })
                                 }
-                            
                             })
-                        }
-                        else {
-                            // no more coins...
-                            console.log("no more coins")
-                            // unauthorized...
-                            socketIO.emit("no_more_coins_to_continue_call", {user_from_id: sender_id, user_to_id: receiver_id});
-                        }
-                        }
-                    })
                         } else {
                             console.log("333333")
                             // unauthorized...
