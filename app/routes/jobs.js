@@ -9,6 +9,471 @@ const NodeGeocoder = require('node-geocoder');
 var distance=require('google-distance-matrix');
 const config=require('config');
 
+exports.getMessage=function(data,user2_id,callback) {
+    async.waterfall([
+        function (cb) {
+            var sql = 'SELECT * FROM `messages` WHERE (`user_from_id`='+data+' AND `user_to_id`='+user2_id+') OR (`user_from_id`='+user2_id+' AND `user_to_id`='+data+')';
+            connection.query(sql, (error, user)=> {
+                if (error) {
+                    cb({
+                        message: constants.responseMessages.ERROR_IN_EXECUTION,
+                        status: constants.responseFlags.ERROR_IN_EXECUTION,
+                        response_data: {}
+                    });
+
+                } else {
+
+                     cb(null, {message_list: user});
+                }
+            });
+        }
+    ], function (error, result) {
+      //console.log(result);
+        return callback(error, result);
+    });
+}
+
+
+exports.getMessageLiveVideo=function(user_id,channel,sender_id, callback) { // chat_type: 0 => message, 1 => gift, 2 => heart
+    async.waterfall([
+        function (cb) {
+            var sql = 'SELECT * FROM video_live WHERE call_type=1 AND call_status=1 AND channel_name=?';
+            connection.query(sql, [channel], (error, host)=> {
+                if (error) {
+                    cb({
+                        message: constants.responseMessages.ERROR_IN_EXECUTION,
+                        status: constants.responseFlags.ERROR_IN_EXECUTION,
+                        response_data: {}
+                    });
+
+                } else {
+                    if (host.length > 0) {
+                        var sql = 'SELECT * FROM video_live WHERE user_id=? AND call_status=2 OR call_status=1';
+                        connection.query(sql, [user_id],(error, user)=> {
+                            if (error) {
+                                cb({
+                                    message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                    status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                    response_data: {}
+                                });
+            
+                            } else {
+                                if(user.length > 0) {
+                                    // var insertMessages = 'INSERT INTO video_live_messages (user_id, channel_name, message, gift_id, is_send_heart, coins, chat_type) values(?,?,?,?,?,?,?)';
+                                    var sql = 'SELECT * FROM video_live_messages WHERE channel_name=? AND chat_type=0'
+                                    connection.query(sql, [channel],(error, messages)=> {
+                                        if (error) {
+                                            cb({
+                                                message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                                status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                                response_data: {}
+                                            });
+                        
+                                        } else {
+                                            cb(null, {message_list: messages});
+                                        }
+                                    });   
+                                }
+                                else {
+                                    cb(null, {message_list: []});
+                                }
+                            }
+                        });
+                    }
+                    else {
+                        cb(null, {message_list: []});
+                    }
+                }
+            });
+        }
+    ], function (error, result) {
+      //console.log(result);
+        return callback(error, result);
+    });
+}
+
+
+function sendDataItemInLiveVideoDb (data, callback) {
+    async.waterfall([
+        function (cb) {
+    var insertMessages = 'INSERT INTO video_live_messages (user_id, message_sender_name, receiver_id, channel_name, message, gift_id, is_send_heart, coins, chat_type) values(?,?,?,?,?,?,?,?,?)';
+            connection.query(insertMessages, [data.user_id,data.message_sender_name,data.sender_id,data.channel_name,data.text_message,data.gift_id,data.is_send_heart,data.coins,data.type],(error, messages)=> {
+                if (error) {
+                    cb(null, false);
+
+                } else {
+                    cb(null, true);
+                }
+            })
+            // console.log('query: '+insertMessages);
+        }
+        ], function (error, result) {
+            //console.log(result);
+              return callback(error, result);
+          });
+}
+
+exports.insertMessageLiveVideo=function(data, channel, callback) { // chat_type: 0 => message, 1 => gift, 2 => heart
+    const user_id = data.user_id;
+    const receiver_id = data.sender_id;
+    const chat_type = data.type;
+    const gift_id = data.gift_id;
+    const textMessage = data.text_message;
+    const messageSenderName = data.message_sender_name;
+    async.waterfall([
+        function (cb) {
+            let message = {
+                giftID : 0,
+                giftName : "",
+                giftImage : "",
+                giftCoins : "",
+                userImage : "",
+                user_first_name : "",
+                user_last_name : "",
+                channelName : channel,
+                message_sender_name : "",
+                text_message : null,
+                sendGift : false,
+                is_send_heart : 0,
+                chat_type : chat_type,
+                message: ""
+               }
+            if(chat_type == 0) {
+                // var checkUser = 'SELECT * FROM `users` WHERE id=?';
+                // connection.query(checkUser, [user_id],(error, user)=> {
+                //     if (error) {
+                //         cb({
+                //             message: constants.responseMessages.ERROR_IN_EXECUTION,
+                //             status: constants.responseFlags.ERROR_IN_EXECUTION,
+                //             response_data: {}
+                //         });
+    
+                //     } else {
+                        // message.userImage =  user[0].profilePics;
+                        message.user_first_name =  data.firstName;
+                        message.user_last_name = data.lastName;
+                        message.text_message =  textMessage;
+                        message.message_sender_name = messageSenderName;
+                        // cb(null, {message: message});
+                        sendDataItemInLiveVideoDb(data,function(err,message_data){
+                            // console.log('msg data: '+message_data);
+                            if (message_data === true) {
+                                cb(null, {message: message});
+                            }
+                            else {
+                                console.log(message_data+' something went wrong.... when text message fire');
+                                message.message = "something went wrong....";
+                                cb(null, {message: message});
+                            }
+                        })
+                // }
+                // });
+            } 
+            else if(chat_type == 1) {
+                var checkUserCoins = 'SELECT * FROM `users` WHERE id=?';
+                connection.query(checkUserCoins, [user_id],(error, user)=> {
+                    if (error) {
+                        cb({
+                            message: constants.responseMessages.ERROR_IN_EXECUTION,
+                            status: constants.responseFlags.ERROR_IN_EXECUTION,
+                            response_data: {}
+                        });
+    
+                    } 
+                    else {
+                        var getGift = 'SELECT * FROM gifts WHERE id=?';
+                            connection.query(getGift, [gift_id],(error, gift)=> {
+                                if (error) {
+                                    cb({
+                                        message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                        status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                        response_data: {}
+                                    });
+                
+                                } 
+                                else {
+                                    message.giftID = gift_id;
+                                    message.giftName = gift[0].name;
+                                    message.giftImage = gift[0].image;
+                                    message.giftCoins = gift[0].coins;
+                                    message.userImage = user[0].profilePics;
+                                    message.user_first_name = user[0].firstName;
+                                    message.user_last_name = user[0].lastName;
+                                    message.sendGift = false;
+                                    
+
+                                    let userCoins = user[0].coins;
+                                    if (userCoins >= message.giftCoins) {
+                                        message.sendGift = true;
+                                        removeCoins = parseInt(userCoins)-parseInt(message.giftCoins);
+                                        var updateCoins = 'UPDATE `users` SET coins = ? WHERE id = ?';
+                                        connection.query(updateCoins, [removeCoins,user_id],(error, users)=> {
+                                            if (error) {
+                                                cb({
+                                                    message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                                    status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                                    response_data: {}
+                                                });
+                            
+                                            } else {
+                                                var addReceiverCoins = 'SELECT * FROM `users` WHERE id=?';
+                                                connection.query(addReceiverCoins, [receiver_id],(error, receiver)=> {
+                                                    if (error) {
+                                                        cb({
+                                                            message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                                            status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                                            response_data: {}
+                                                        });
+                                                    } else {
+                                                        //console.log(receiver_id, receiver, "fffff......")
+                                                        let receiverCoins = receiver[0].coins;
+                                                        //console.log(receiverCoins, "receiverCoins......")
+                                                            message.sendGift = true;
+                                                            addCoins = parseInt(receiverCoins)+parseInt(message.giftCoins);
+                                                            var updateCoins = 'UPDATE `users` SET coins = ? WHERE id = ?';
+                                                            connection.query(updateCoins, [addCoins,receiver_id],(error, users)=> {
+                                                                if (error) {
+                                                                    cb({
+                                                                        message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                                                        status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                                                        response_data: {}
+                                                                    });
+                                                                } else {
+                                                                    // console.log(gift_id, receiver_id, user_id, "kkkkkkkkkk")
+                                                                    var insertGiftStatus = 'INSERT INTO gifts_status (gift_id, given_to, given_by) values(?,?,?)';
+                                                                    connection.query(insertGiftStatus, [gift_id, receiver_id, user_id],(error, add_coins)=> {
+                                                                        if (error) {
+                                                                            console.log(error, "my error...")
+                                                                            cb({
+                                                                                message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                                                                status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                                                                response_data: {}
+                                                                            });
+
+                                                                        } else {
+                                                                            // cb(null, {message: add_coins});
+                                                                    //    console.log("llll")
+                                                                    var insertcommonHistory = 'INSERT INTO common_coins_history (gifts_id, sender_id, receiver_id, coins, coins_spent_on, add_coins_to_receiver, subtract_coins_to_sender) values(?,?,?,?,?,?,?)';
+                                                                    connection.query(insertcommonHistory, [gift_id,user_id,receiver_id,message.giftCoins,'send_gift',message.giftCoins,message.giftCoins],(error, coins_history)=> {
+                                                                        if (error) {
+                                                                            cb({
+                                                                                message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                                                                status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                                                                response_data: {}
+                                                                            });
+                                                                        } else {
+                                                                            // cb(null, {message: coins_history});
+                                                                            sendDataItemInLiveVideoDb(data,function(err,message_data){
+                                                                                // console.log('msg data: '+message_data);
+                                                                                if (message_data === true) {
+                                                                                    cb(null, {message: message});
+                                                                                }
+                                                                                else {
+                                                                                    console.log('something went wrong.... when send gift');
+                                                                                    message.message = "something went wrong....";
+                                                                                    cb(null, {message: message});
+                                                                                }
+                                                                            })
+                                                                        }
+                                                                    });
+                                                                }
+                                                                // console.log(insertGiftStatus, "hahaahha")
+                                                            })
+                                                        }
+                                                    })
+                                                }
+                                            })
+                                        }
+                                    })                                       
+                                    }      
+                                    else{
+                                        message.message = "no coins left..";
+                                        cb(null, {message: message});
+                                    }
+                        }
+                            }); 
+                    }
+                });
+                
+            } 
+            else {  //chat_type == 2
+                // var checkUser = 'SELECT * FROM `users` WHERE id=?';
+                // connection.query(checkUser, [user_id],(error, user)=> {
+                //     if (error) {
+                //         cb({
+                //             message: constants.responseMessages.ERROR_IN_EXECUTION,
+                //             status: constants.responseFlags.ERROR_IN_EXECUTION,
+                //             response_data: {}
+                //         });
+    
+                    // } else {
+                            // message.userImage = user[0].profilePics;
+                            // message.user_first_name = user[0].firstName;
+                            // message.user_last_name = user[0].lastName;
+                            message.is_send_heart = 1;
+                            cb(null, {message: message});
+                            // sendDataItemInLiveVideoDb(data,function(err,message_data){
+                            //     if (message_data === true) {
+                            //         cb(null, {message: message});
+                            //     }
+                            //     else {
+                            //         message.message = "something went wrong....";
+                            //         cb(null, {message: message});
+                            //     }
+                            // })
+                    // }
+                // });
+            }   
+
+        }
+    ], function (error, result) {
+      //console.log(result);
+        return callback(error, result);
+    });
+}
+
+
+exports.manageViewsLiveVideo=function(data, callback) { // call_type: 1 => host, 2 => audience , user_id = audience, sender_id = host
+    const channel_name = data.channel_name;
+
+    async.waterfall([
+        function (cb) {
+            var countTotalViews = 'SELECT COUNT(*) as totalviews FROM `video_live` WHERE channel_name=? AND call_status=2';
+                connection.query(countTotalViews, [channel_name],(error, totalViews)=> {
+                    if (error) {
+                        cb({
+                            message: constants.responseMessages.ERROR_IN_EXECUTION,
+                            status: constants.responseFlags.ERROR_IN_EXECUTION,
+                            response_data: {}
+                        });
+    
+                    } else {
+                        cb(null, totalViews[0].totalviews)
+                    }
+                })
+            }
+        ], function (error, result) {
+            //console.log(result);
+                return callback(error, result);
+            });
+        }
+                          
+
+
+exports.manageCoinsTimeViewsLiveVideo=function(data, callback) { // call_type: 1 => host, 2 => audience , user_id = audience, sender_id = host
+    const channel_name = data.channel_name;
+    const user_id = Number(data.user_id);
+    const sender_id = Number(data.sender_id);
+    const counter = data.counter;
+
+    data.msg = "";
+    data.error = true;
+
+    async.waterfall([
+        function (cb) {
+            var sql = 'SELECT * FROM users WHERE id=?';
+            connection.query(sql, [user_id],(error, user)=> {
+                if (error) {
+                    cb({
+                        message: constants.responseMessages.ERROR_IN_EXECUTION,
+                        status: constants.responseFlags.ERROR_IN_EXECUTION,
+                        response_data: {}
+                    });
+
+                } else {
+                    if(user.length > 0) {
+                                console.log(sender_id, user_id, "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd")
+                                let getSenderCoins = user[0].coins;
+                                console.log(user[0].coins, user_id, "fffffffffffffffffffffffffffffffffffffffffffffff")
+                                if (user_id != sender_id) {
+                                    console.log("counter:", counter)
+                                    if(counter>15) { // charge after 25 seconds , 15 + 10(time interval) = 25
+                                        if(getSenderCoins <= 0) { //charge 2 coins every 1 sec, 10 seconds => 10 X 2 = 20 coins
+                                            console.log('sorry, No Coins Left');
+                                            var declineCall = 'UPDATE `video_live` SET call_status = 3 WHERE channel_name = ? AND call_status=2';
+                                            connection.query(declineCall, [channel_name],(error, data)=> {
+                                                if (error) {
+                                                    cb({
+                                                        message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                                        status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                                        response_data: {}
+                                                    });
+                                
+                                                } else {
+                                                        data.channel_name = channel_name;
+                                                        data.user_id = user_id;
+                                                        data.error = true;
+                                                        data.msg = "Sorry, No Coins Left";
+                                                        cb(null, data);
+                                                    }
+                                            });
+                                        } else {
+                                            let remaningCoins = parseInt(getSenderCoins) - parseInt(20);
+                                            var updateCoins = 'UPDATE `users` SET coins = ? WHERE id = ?';
+                                            connection.query(updateCoins, [remaningCoins, user_id],(error, data)=> {
+                                                if (error) {
+                                                    cb({
+                                                        message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                                        status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                                        response_data: {}
+                                                    });
+                                
+                                                } else {
+                                                    var insertcommonHistory = 'INSERT INTO common_coins_history (gifts_id, sender_id, receiver_id, coins, coins_spent_on, add_coins_to_receiver, subtract_coins_to_sender) values(?,?,?,?,?,?,?)';
+                                                    connection.query(insertcommonHistory, ['0',user_id,'0','20','live_video_call','0','20'],(error, coins_history)=> {
+                                                        if (error) {
+                                                            cb({
+                                                                message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                                                status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                                                response_data: {}
+                                                            });
+                                                        } else {
+                                                            console.log('Remaining coins: '+remaningCoins);
+                                                            data.channel_name = channel_name;
+                                                            data.user_id = user_id;
+                                                            data.error = remaningCoins == 0 ? true : false;
+                                                            data.msg = remaningCoins == 0 ? "Sorry, No Coins Left" : "";
+                                                            data.coins = remaningCoins;
+                                                            cb(null, data);
+                                                        }
+                                                    });
+                                                        
+                                                    }
+                                            });
+                                        }
+                                        
+                                    }
+                                    else {
+                                        console.log('Remaining coins: '+getSenderCoins);
+                                        data.channel_name = channel_name;
+                                        data.user_id = user_id;
+                                        data.error = getSenderCoins == 0 ? true : false;
+                                        data.msg = getSenderCoins == 0 ? "Sorry, No Coins Left" : "";
+                                        data.coins = getSenderCoins;
+                                        cb(null, data);
+                                    }
+                                } 
+                                else {
+                                    // host case
+                                    console.log('Remaining coins: '+getSenderCoins);
+                                    data.channel_name = channel_name;
+                                    data.user_id = user_id;
+                                    data.error = false;
+                                    data.msg = "";
+                                    data.coins = getSenderCoins;
+                                    cb(null, data);
+                                }
+                                // cb(null, {message_list: messages});
+                            }
+                        }
+                    })
+        }
+    ], function (error, result) {
+        //console.log(result);
+        return callback(error, result);
+    });
+}
+
 
 
 const checkIfUserSendMessage = (sender_id, reciever_id, callback) => {
@@ -44,11 +509,13 @@ const checkIfUserSendMessage = (sender_id, reciever_id, callback) => {
         });
         }
 
-exports.getMessage=function(data,user2_id,callback) {
+
+        // getMessage
+exports.checkIfUserHasCoins=function(sender_id,callback) {
     async.waterfall([
         function (cb) {
-            var sql = 'SELECT * FROM `messages` WHERE (`user_from_id`='+data+' AND `user_to_id`='+user2_id+') OR (`user_from_id`='+user2_id+' AND `user_to_id`='+data+')';
-            connection.query(sql, (error, user)=> {
+            var sqlCheckUserCoins = "SELECT * FROM `users` WHERE id = ?";
+            connection.query(sqlCheckUserCoins, [sender_id],(error, data)=> {
                 if (error) {
                     cb({
                         message: constants.responseMessages.ERROR_IN_EXECUTION,
@@ -57,9 +524,12 @@ exports.getMessage=function(data,user2_id,callback) {
                     });
 
                 } else {
-
-                     cb(null, {message_list: user});
-                }
+                        let callMake = false;
+                        if (data[0].coins > 20) {
+                            callMake = true;
+                        }
+                        cb(null, {callMake});
+                    }
             });
         }
     ], function (error, result) {
@@ -189,6 +659,121 @@ exports.makeMeLive=function(data, callback) {
 }
 
 // Gift send image
+// sendGiftToSql
+
+// End gift here
+
+exports.sendMessage=function(data,callback)
+{
+    var reciever_id=data.reciever_id;
+    var sender_id = null;
+    var session_id=data.session_id;
+    var message=data.message;
+     var datetime = moment.utc().format('YYYY-MM-DD HH:mm:ss');
+    async.waterfall([
+        function (cb) {
+          var sql = `SELECT * FROM app_login WHERE session_id = ?`;
+            connection.query(sql, [session_id], (error, user)=> {
+                if (error) {
+                    cb({
+                        message: constants.responseMessages.ERROR_IN_EXECUTION,
+                        status: constants.responseFlags.ERROR_IN_EXECUTION,
+                        response_data: {}
+                    });
+                } else {
+                     cb(null, user);
+                }
+            });
+          },
+          function(user,cb)
+        {
+            if (!user || (user && user.length === 0)) 
+             {
+              //console.log('yes');
+                      return cb({
+                          message: constants.responseMessages.INVALID_ACCESS,
+                          status: constants.responseFlags.INVALID_ACCESS,
+                          driver_payment_response: {}
+                      });
+              }else
+              {
+                //console.log(user);
+                sender_id=user[0]['user_id'];
+                checkIfUserSendMessage(sender_id,reciever_id,function(err,message_data){
+                    if(err)
+                    {
+                        cb(null);
+                    }
+                    else
+                    {
+                        const checkIfUserSend = message_data.emitMessage;
+                        const warningMessage = message_data.emitLimitMessage;
+                        console.log(warningMessage,'warningMessage......')
+                        if(checkIfUserSend)
+                        {
+                  var device_type=user[0]['device_type'];
+                  var sql = "INSERT INTO `messages` (`user_from_id`,`user_to_id`,`message`,`created_at`,`updated_at`, `message_is_read`) VALUES(?,?,?,?,?,?)";
+                    var query=connection.query(sql,[sender_id,reciever_id,message,datetime,datetime, 1], (error, user)=> {
+                        if (error) {
+                          console.log(error);
+                            cb({
+                                message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                response_data: {}
+                            });
+                        } else {
+                           var message_id=user.insertId;
+                           var sql1=`SELECT * FROM messages where user_from_id = ? AND user_to_id = ? ORDER BY id DESC`;
+                            //var sql1=`SELECT * FROM messages where msg_id = ?  ORDER BY id DESC`;
+                              connection.query(sql1,[sender_id,reciever_id], (error, message_data)=> {
+                                if(error)
+                                 {
+                                        console.log(error);
+                                             cb({
+                                            message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                            status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                            response_data: {}
+                                        });
+                                 }else
+                                 {
+                                    //  Checking if error message is not empty
+                                        var obj = {};
+                                        obj['status'] = 200;
+                                        obj['message'] = message_data[0]['message'];
+                                        obj['user_from_id'] = message_data[0]['user_from_id'];
+                                        obj['user_to_id'] = message_data[0]['user_to_id'];
+                                        obj['message_id'] = message_data[0]['id'];
+                                        obj['created_at'] = message_data[0]['created_at'];
+                                        obj['updated_at'] = message_data[0]['updated_at'];
+                                           cb(null,{obj});        
+                                 }
+                              })
+                        }
+                    });
+                }
+                else {
+                    if (!!warningMessage) {
+                        var obj = {};
+                        obj['status'] = 200;
+                        obj['message'] = null;
+                        obj['user_from_id'] = sender_id;
+                        obj['user_to_id'] = reciever_id;
+                        obj['message_id'] = null;
+                        obj['created_at'] = null;
+                        obj['updated_at'] = null;
+                        obj['warningMessage'] = warningMessage
+                           cb(null,{obj});        
+                    }
+                }
+            }
+        });
+    }
+        }
+    ], function (error, result) {
+        return callback(error, result);
+    });
+}
+
 exports.sendGiftToSql = function (data, callback) { // file, filename,
     console.log('data', data);
     var reciever_id = data.reciever_id;
@@ -222,7 +807,6 @@ exports.sendGiftToSql = function (data, callback) { // file, filename,
                 //console.log(user);
                 var sender_id = user[0]['user_id'];
                 checkIfUserSendMessage(sender_id,reciever_id,function(err,message_data){
-
                     if(err)
                     {
                         cb(null);
@@ -234,11 +818,8 @@ exports.sendGiftToSql = function (data, callback) { // file, filename,
                         console.log(message_data,"message_data....");
                         if(checkIfUserSend)
                         {
-                      
-               
                 var sql = 'INSERT INTO `messages` (`user_from_id`,`user_to_id`,`message`, `media`,`created_at`,`updated_at`, `message_is_read`) VALUES(?,?,?,?,?,?,?)'
                 var query = connection.query(sql, [sender_id, reciever_id, "", data.file, datetime, datetime, 1], (error, user) => {
-                    
                     // Checking message length her
                     if (error) {
                         console.log(error);
@@ -274,7 +855,6 @@ exports.sendGiftToSql = function (data, callback) { // file, filename,
                         })
                     }})
                 // console.log(query, "query...")
-
             }
             else
             {
@@ -300,7 +880,6 @@ exports.sendGiftToSql = function (data, callback) { // file, filename,
         return callback(error, result);
     })
 }
-// End gift here
 
 exports.makeMeAudience=function(data, callback) {
     async.waterfall([
@@ -412,7 +991,7 @@ exports.getVideoLiveList = function(callback) {
                     cb(null, [])
                 }
                 else {
-                    console.log("video live list fetched....", list)
+                    // console.log("video live list fetched....", list)
                     cb(null, list)
                 }
             })
