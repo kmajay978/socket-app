@@ -3,13 +3,6 @@ const express= require('express');
 const bodyParser= require('body-parser');
 const config=require('config');
 const mysql=require('mysql');
-const autoload = require('./app/routes/autoload');
-const users = require('./app/routes/users');
-const jobs = require('./app/routes/jobs');
-const drivers =require('./app/routes/drivers');
-const validate = require('./app/routes/validate');
-const socketJs = require('./app/routes/socket');
-const order=require('./app/routes/order');
 var db_config = require('./config/development.json');
 
 /* Database connection config*/
