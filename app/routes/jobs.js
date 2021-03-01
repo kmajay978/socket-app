@@ -988,11 +988,22 @@ exports.getVideoLiveList = function(callback) {
             const query = connection.query(sqlVideoLiveList, function(error, list) {
                 if (error) {
                     console.log("failed fetching the video live list...", error);
-                    cb(null, [])
+                    cb(null, {live: [], online: []})
                 }
                 else {
                     // console.log("video live list fetched....", list)
-                    cb(null, list)
+                    // cb(null, list)
+                    var sqlVideoLiveList = "SELECT * FROM `app_login`";
+                    const query = connection.query(sqlVideoLiveList, function(error, online_users) {
+                        if (error) {
+                            console.log("failed fetching the online users list...", error);
+                            cb(null, {live: [], online: []})
+                        }
+                        else {
+                            // console.log("video live list fetched....", list)
+                            cb(null, {live: list, online: online_users})
+                        }
+                    })
                 }
             })
         }
