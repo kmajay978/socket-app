@@ -566,7 +566,7 @@ exports.socketInitialize = function (httpServer) {
             job.getVideoLiveList(function (err, list) {
                 //console.log('message data',message_data);
                 if (err) {
-                    socketIO.emit("live_friends", []);
+                    socketIO.emit("live_friends", list);
                 } else {
                     socketIO.emit("live_friends", list);
                 }
