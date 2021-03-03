@@ -7,6 +7,7 @@ var videoCallState;
 var video_live_hosts = [];
 
 var startTimeLiveVideoCall = []
+var startTimeOneToOneVideoCall = []
 
 exports.socketInitialize = function (httpServer) {
     console.log("INNN");
@@ -298,6 +299,7 @@ exports.socketInitialize = function (httpServer) {
                                                 if (data.videoCallState !== null) {
                                                     console.log("sender found...")
                                                     videoCallState = data.videoCallState;
+                                                    startTimeOneToOneVideoCall.push({ channel: data.channel_name, start_time: new Date().getTime() })
                                                     // emit event call send/receive....
                                                     // query to get the receiver details..
                                                     job.getReceiverDetails(sender_id, receiver_id, data.type, function (err, getData) {
@@ -536,7 +538,8 @@ exports.socketInitialize = function (httpServer) {
                 } else {
                     socketIO.emit("receiver_decline_video_call", {
                         user_from_id: data.sender.user_from_id,
-                        user_to_id: data.reciever_id
+                        user_to_id: data.reciever_id,
+                        showMsg: data.showMsg
                     });
                 }
             })
@@ -554,7 +557,8 @@ exports.socketInitialize = function (httpServer) {
                 } else {
                     socketIO.emit("sender_decline_video_call", {
                         user_from_id: data.sender.user_from_id,
-                        user_to_id: data.reciever_id
+                        user_to_id: data.reciever_id,
+                        showMsg: data.showMsg
                     });
                 }
             })
@@ -785,8 +789,100 @@ exports.socketInitialize = function (httpServer) {
             }
         })
     });
+
+/* one to one video call sockets */
+
+// one-to-one video manage time socktes
+socket.on('one_to_one_video_manage_time', function (data) {
+    let start_time = null;
+    startTimeOneToOneVideoCall.forEach((item, index) => {
+        if (data.channel_name == item.channel) {
+            start_time = item.start_time
+        }
+    })
+    if (start_time != null) {
+        var start = moment(start_time);
+        var end = moment(new Date().getTime());
+        var time = start.from(end);
+        data.time = time;
+        socketIO.emit("one_to_one_video_manage_time", data);
+    }   
+    else {
+        console.log(start_time, "wrong start time.....")
+    }
+});  // done
+
+
+// Manage one-to-one video coins, time, views socktes
+socket.on('one_to_one_video_manage_coins_time_views', function (data) {
+    job.manageCoinsTimeViewsOneToOneVideo(data, function (err, message_data) {
+        if (err) {
+            data.msg = "We are facing some technical issues. Please call after some time."
+            socketIO.emit("end_one_to_one_video_call_warning", data)   
+            console.log("error found ..., one_to_one_video_manage_coins_time_views", err);
+        }
+        else {
+            console.log(message_data, "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")
+            if (message_data.error == false && message_data.msg == "") {
+                console.log(message_data+" successssssssssssss");
+                socketIO.emit("one_to_one_video_manage_coins_time_views", message_data);  
+            }
+            else {
+                console.log(data+" erroorrrrrrrrrrrrrrr");
+                socketIO.emit("end_one_to_one_video_call_no_coin_warning", message_data)
+            }
+        
+        }
+    })
+}); // done
+
+socket.on('typing_one_to_one_video_message', function (data) {
+    socketIO.emit('typing_one_to_one_video_message', data);
+});  // done
+
+   socket.on('authenticate_one_to_one_video_message', function (data) {
+    var sql = "SELECT * FROM app_login WHERE user_id = ? LIMIT 1";
+    connection.query(sql, [data.user_id, data.sender_id], function (error, user) {  //user_id=receiver(audience) , sender_id=host (sender)
+        if (error) {
+            socketIO.to(socket_id).emit("get_messages_one_to_one_video", {error: true, messages: [], error_message: "Unauthorized user access.", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id});
+            socket.conn.close();
+        } else if (user && user.length > 0) {
+            if (user[0].user_id > 0) {
+                job.getMessageOneToOneVideo(data.user_id, data.channel_name, data.sender_id, function (err, message_data) {
+                    if (!err) {
+                        socketIO.to(socket.id).emit("get_messages_one_to_one_video", {error: false, messages: message_data.message_list, channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id})  
+                    }
+                    else {
+                        socketIO.to(socket.id).emit("get_messages_one_to_one_video", {error: true, messages: [], error_message: "Error fetching the messages", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id})  
+                    }
+                })
+            } else {
+                socketIO.to(socket_id).emit("get_messages_one_to_one_video", {error: true, messages: [], error_message: "Unauthorized user access." ,channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id});
+                socket.conn.close();
+            }
+        } else {
+            console.log("Unauthorized");
+            socketIO.to(socket_id).emit("get_messages_one_to_one_video", {error: true, messages: [], error_message: "Unauthorized user access.", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id});
+            socket.conn.close();
+        }
+    });
+}); 
+
+// Insert one-to-one video messages socktes
+socket.on('send_one_to_one_video_item', function (data) {
+    job.insertMessageOneToOneVideo(data, data.channel_name, function (err, message_data) {
+        if (err) {
+            console.log("error found ..., send_live_video_item", err);
+            // socketIO.emit("send_live_video_item", {message: null, error_message: "Something went wrong...", channel_name: data.channel_name})  
+        }
+        else {
+            socketIO.emit("send_one_to_one_video_item", {message: message_data.message, channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id})  
+        }
+    })
+});
 })
 }
+
 
 
 
