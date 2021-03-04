@@ -852,6 +852,122 @@ exports.manageCoinsTimeViewsOneToOneVideo=function(data, callback) {
     });
 }
 
+exports.manageCoinsTimeViewsOneToOneAudio=function(data, callback) { 
+    const channel_name = data.channel_name;
+    const user_id = Number(data.user_id);
+    const sender_id = Number(data.sender_id);
+    const counter = data.counter;
+
+    data.msg = "";
+    data.error = true;
+
+    async.waterfall([
+        function (cb) {
+            var sql = 'SELECT * FROM users WHERE id=?';
+            connection.query(sql, [user_id],(error, user)=> {
+                if (error) {
+                    cb({
+                        message: constants.responseMessages.ERROR_IN_EXECUTION,
+                        status: constants.responseFlags.ERROR_IN_EXECUTION,
+                        response_data: {}
+                    });
+
+                } else {
+                    if(user.length > 0) {
+                                console.log(sender_id, "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd")
+                                let getSenderCoins = user[0].coins;
+                                console.log(user[0].coins, user_id, "fffffffffffffffffffffffffffffffffffffffffffffff")
+                                if (user_id == sender_id) { // sender
+                                    console.log("counter:", counter)
+                                    if(counter>15) { // charge after 25 seconds , 15 + 10(time interval) = 25
+                                        if(getSenderCoins <= 0) { //charge 2 coins every 1 sec, 10 seconds => 10 X 2 = 20 coins
+                                            console.log('sorry, No Coins Left');
+                                            var declineCall = 'UPDATE `audio_call` SET call_status = 2 WHERE channel_name = ?';
+                                            connection.query(declineCall, [channel_name],(error, data)=> {
+                                                if (error) {
+                                                    cb({
+                                                        message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                                        status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                                        response_data: {}
+                                                    });
+                                
+                                                } else {
+                                                        data.channel_name = channel_name;
+                                                        data.user_id = user_id;
+                                                        data.sender_id = sender_id;
+                                                        data.error = true;
+                                                        data.msg = "Sorry, No Coins Left";
+                                                        cb(null, data);
+                                                    }
+                                            });
+                                        } else {
+                                            let remaningCoins = parseInt(getSenderCoins) - parseInt(20);
+                                            var updateCoins = 'UPDATE `users` SET coins = ? WHERE id = ?';
+                                            connection.query(updateCoins, [remaningCoins, sender_id],(error, data)=> {
+                                                if (error) {
+                                                    cb({
+                                                        message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                                        status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                                        response_data: {}
+                                                    });
+                                
+                                                } else {
+                                                    var insertcommonHistory = 'INSERT INTO common_coins_history (gifts_id, sender_id, receiver_id, coins, coins_spent_on, add_coins_to_receiver, subtract_coins_to_sender) values(?,?,?,?,?,?,?)';
+                                                    connection.query(insertcommonHistory, ['0',sender_id,user_id,'20','video_call','0','20'],(error, coins_history)=> {
+                                                        if (error) {
+                                                            cb({
+                                                                message: constants.responseMessages.ERROR_IN_EXECUTION,
+                                                                status: constants.responseFlags.ERROR_IN_EXECUTION,
+                                                                response_data: {}
+                                                            });
+                                                        } else {
+                                                            console.log('Remaining coins: '+remaningCoins);
+                                                            data.channel_name = channel_name;
+                                                            data.user_id = user_id;
+                                                            data.sender_id = sender_id;
+                                                            data.error = remaningCoins == 0 ? true : false;
+                                                            data.msg = remaningCoins == 0 ? "Sorry, No Coins Left" : "";
+                                                            data.coins = remaningCoins;
+                                                            cb(null, data);
+                                                        }
+                                                    });
+                                                        
+                                                    }
+                                            });
+                                        }
+                                    }
+                                    else { 
+                                        console.log('Remaining coins: '+getSenderCoins);
+                                        data.channel_name = channel_name;
+                                        data.user_id = user_id;
+                                        data.sender_id = sender_id;
+                                        data.error = getSenderCoins == 0 ? true : false;
+                                        data.msg = getSenderCoins == 0 ? "Sorry, No Coins Left" : "";
+                                        data.coins = getSenderCoins;
+                                        cb(null, data);
+                                    }
+                                } 
+                                else { // receiver
+                                    console.log('Remaining coins: '+getSenderCoins);
+                                    data.channel_name = channel_name;
+                                    data.user_id = user_id;
+                                    data.sender_id = sender_id;
+                                    data.error = false;
+                                    data.msg = "";
+                                    data.coins = getSenderCoins;
+                                    cb(null, data);
+                                }
+                                // cb(null, {message_list: messages});
+                            }
+                        }
+                    })
+        }
+    ], function (error, result) {
+        //console.log(result);
+        return callback(error, result);
+    });
+}
+
 
 const checkIfUserSendMessage = (sender_id, reciever_id, callback) => {
     async.waterfall([

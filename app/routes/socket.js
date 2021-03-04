@@ -8,6 +8,7 @@ var video_live_hosts = [];
 
 var startTimeLiveVideoCall = []
 var startTimeOneToOneVideoCall = []
+var startTimeOneToOneAudioCall = []
 
 exports.socketInitialize = function (httpServer) {
     console.log("INNN");
@@ -403,6 +404,7 @@ exports.socketInitialize = function (httpServer) {
                                                 if (data.videoCallState !== null) {
                                                     console.log("sender found...")
                                                     videoCallState = data.videoCallState;
+                                                    startTimeOneToOneAudioCall.push({ channel: data.channel_name, start_time: new Date().getTime() })
                                                     // emit event call send/receive....
                                                     // query to get the receiver details..
                                                     job.getReceiverDetails(sender_id, receiver_id, data.type, function (err, getData) {
@@ -880,9 +882,53 @@ socket.on('send_one_to_one_video_item', function (data) {
         }
     })
 });
+
+/* one to one audio call sockets */
+
+// one-to-one audio manage time socktes
+socket.on('one_to_one_audio_manage_time', function (data) {
+    let start_time = null;
+    startTimeOneToOneAudioCall.forEach((item, index) => {
+        if (data.channel_name == item.channel) {
+            start_time = item.start_time
+        }
+    })
+    if (start_time != null) {
+        var start = moment(start_time);
+        var end = moment(new Date().getTime());
+        var time = start.from(end);
+        data.time = time;
+        socketIO.emit("one_to_one_audio_manage_time", data);
+    }   
+    else {
+        console.log(start_time, "wrong start time.....")
+    }
+});  // done
+
+
+// Manage one-to-one video coins, time, views socktes
+socket.on('one_to_one_audio_manage_coins_time_views', function (data) {
+    job.manageCoinsTimeViewsOneToOneAudio(data, function (err, message_data) {
+        if (err) {
+            data.msg = "We are facing some technical issues. Please call after some time."
+            socketIO.emit("end_one_to_one_audio_call_warning", data)   
+            console.log("error found ..., one_to_one_audio_manage_coins_time_views", err);
+        }
+        else {
+            console.log(message_data, "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")
+            if (message_data.error == false && message_data.msg == "") {
+                console.log(message_data+" successssssssssssss");
+                socketIO.emit("one_to_one_audio_manage_coins_time_views", message_data);  
+            }
+            else {
+                console.log(data+" erroorrrrrrrrrrrrrrr");
+                socketIO.emit("end_one_to_one_audio_call_no_coin_warning", message_data)
+            }
+        
+        }
+    })
+}); // done
 })
 }
-
-
 
 
