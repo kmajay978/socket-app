@@ -7,6 +7,7 @@
 		"user":"systemadmin",
 		"password":"G$tintoPc",
 		"database":"glitter-101"
+		
 	},
 	 "emailCredentials": {
         "host": "smtp.mandrillapp.com",
