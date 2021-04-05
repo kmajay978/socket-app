@@ -10,12 +10,15 @@ var startTimeLiveVideoCall = []
 var startTimeOneToOneVideoCall = []
 var startTimeOneToOneAudioCall = []
 
+var socket;
+
 exports.socketInitialize = function (httpServer) {
     console.log("INNN");
     var socketIO = require('socket.io').listen(httpServer);
     socketIO.on('connection', function (socket) {
+        socket = socket
         console.log("socket id ", socket.id);
-        socket_id = socket.id; 
+        socket_id = socket.id;
         console.log("Connected users ", usersConnected);
         /*
         * Authenticate user just after socket connection
@@ -137,6 +140,20 @@ exports.socketInitialize = function (httpServer) {
                 }
             })
         })
+
+        /* ---- gifts -----*/
+        socket.on('gift_send', function (data) {
+            job.sendGiftToSql(data, function (err, getData) {
+                if (err) {
+                    console.log("error gift222222", err)
+                }
+                else {
+                    socketIO.emit('gift_send', getData)
+                }
+            });
+        })
+
+        // ----------------------------------------------------------------------------------
         socket.on('UserSendMessage', function (data) {
             job.getOrderData(data, function (err, result) {
                 socketIO.to(socket_id).emit('order_data', result);
@@ -198,8 +215,8 @@ exports.socketInitialize = function (httpServer) {
                                     });
                                 })
                             }
-                        else {
-                            console.log("i am hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
+                            else {
+                                console.log("i am hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
                             }
                         }
                     })
@@ -255,7 +272,7 @@ exports.socketInitialize = function (httpServer) {
                 var test = connection.query(sqlUserAuth, [sender_id, receiver_id, sender_id, receiver_id], function (error, user) {
                     if (error) {
                         console.log(error, "11111")
-                        socketIO.emit("unauthorize_video_call", {user_from_id: sender_id, user_to_id: receiver_id});
+                        socketIO.emit("unauthorize_video_call", { user_from_id: sender_id, user_to_id: receiver_id });
                     } else {
                         console.log(test, "test query....")
                         if (user.length > 0) {
@@ -314,14 +331,14 @@ exports.socketInitialize = function (httpServer) {
                                                             // myInterval = setInterval( function() { intervalFunc(data.type); }, 1000 );
                                                             socketIO.emit("pick_video_call",
                                                                 Object.assign(receiver_details, {
-                                                                        user_from_id: sender_id,
-                                                                        user_to_id: receiver_id,
-                                                                        type: data.type,
-                                                                        link: "/true/" + sender_id + "/" + receiver_id + "/" + videoCallState.channel_id + "/" + videoCallState.channel_name + "/video-chat",
-                                                                        channel_name: videoCallState.channel_name,
-                                                                        sender_details
-                                                                    })
-                                                                )
+                                                                    user_from_id: sender_id,
+                                                                    user_to_id: receiver_id,
+                                                                    type: data.type,
+                                                                    link: "/true/" + sender_id + "/" + receiver_id + "/" + videoCallState.channel_id + "/" + videoCallState.channel_name + "/video-chat",
+                                                                    channel_name: videoCallState.channel_name,
+                                                                    sender_details
+                                                                })
+                                                            )
                                                         }
                                                     })
                                                 } else {
@@ -349,17 +366,16 @@ exports.socketInitialize = function (httpServer) {
                         } else {
                             console.log("333333")
                             // unauthorized...
-                            socketIO.emit("unauthorize_video_call", {user_from_id: sender_id, user_to_id: receiver_id});
+                            socketIO.emit("unauthorize_video_call", { user_from_id: sender_id, user_to_id: receiver_id });
                         }
                     }
                 });
-            } else if(data.type === 1) 
-            {
+            } else if (data.type === 1) {
                 var sqlUserAuth = "SELECT * FROM `likes` where user_id = ? and liked_user_id = ? and accept = 1 or liked_user_id = ? and user_id = ? and accept = 1";
                 var test = connection.query(sqlUserAuth, [sender_id, receiver_id, sender_id, receiver_id], function (error, user) {
                     if (error) {
                         console.log(error, "11111")
-                        socketIO.emit("unauthorize_video_call", {user_from_id: sender_id, user_to_id: receiver_id});
+                        socketIO.emit("unauthorize_video_call", { user_from_id: sender_id, user_to_id: receiver_id });
                     } else {
                         console.log(test, "test query....")
                         if (user.length > 0) {
@@ -418,14 +434,14 @@ exports.socketInitialize = function (httpServer) {
                                                             // myInterval = setInterval( function() { intervalFunc(data.type); }, 1000 );
                                                             socketIO.emit("pick_video_call",
                                                                 Object.assign(receiver_details, {
-                                                                        user_from_id: sender_id,
-                                                                        user_to_id: receiver_id,
-                                                                        type: data.type,
-                                                                        link: "/true/" + sender_id + "/" + receiver_id + "/" + videoCallState.channel_id + "/" + videoCallState.channel_name + "/audio-chat",
-                                                                        channel_name: videoCallState.channel_name,
-                                                                        sender_details
-                                                                    })
-                                                                )
+                                                                    user_from_id: sender_id,
+                                                                    user_to_id: receiver_id,
+                                                                    type: data.type,
+                                                                    link: "/true/" + sender_id + "/" + receiver_id + "/" + videoCallState.channel_id + "/" + videoCallState.channel_name + "/audio-chat",
+                                                                    channel_name: videoCallState.channel_name,
+                                                                    sender_details
+                                                                })
+                                                            )
                                                         }
                                                     })
                                                 } else {
@@ -453,16 +469,16 @@ exports.socketInitialize = function (httpServer) {
                         } else {
                             console.log("333333")
                             // unauthorized...
-                            socketIO.emit("unauthorize_video_call", {user_from_id: sender_id, user_to_id: receiver_id});
+                            socketIO.emit("unauthorize_video_call", { user_from_id: sender_id, user_to_id: receiver_id });
                         }
                     }
                 });
             }
-            
+
             else {
                 console.log("22222")
                 // add query to change the status..... 3
-                socketIO.emit("unauthorize_video_call", {user_from_id: sender_id, user_to_id: receiver_id});
+                socketIO.emit("unauthorize_video_call", { user_from_id: sender_id, user_to_id: receiver_id });
             }
         });
 
@@ -587,7 +603,7 @@ exports.socketInitialize = function (httpServer) {
                     if (err) {
                         console.log("sorry couldn't make host live now...")
                     } else {
-                        video_live_hosts.push({channel_name: data.channel_name, host_id: data.host_id})
+                        video_live_hosts.push({ channel_name: data.channel_name, host_id: data.host_id })
                         console.log("host is live now...")
                         socketIO.emit("start_your_live_video_now", data);
                     }
@@ -648,7 +664,7 @@ exports.socketInitialize = function (httpServer) {
                             }
                         })
                         console.log("audience is active now...")
-                        socketIO.emit("sendAudienceToLiveVideo", Object.assign(data, {host_id}));
+                        socketIO.emit("sendAudienceToLiveVideo", Object.assign(data, { host_id }));
                     }
                 })
             }
@@ -676,259 +692,254 @@ exports.socketInitialize = function (httpServer) {
             })
         })
 
-        /* ---- gifts -----*/
-        socket.on('gift_send',function(data){
-            job.sendGiftToSql(data,function(err,getData){
-                if(err)
-                {
-                    console.log("error gift222222", err)
-                }
-                else
-                {
-                    socketIO.emit('gift_send',getData)
-                }
-            });
-        })
+        /* live video message sockets... */
 
-    /* live video message sockets... */
-
-    socket.on('authenticate_live_video_message', function (data) {
-        var sql = "SELECT * FROM app_login WHERE user_id = ? LIMIT 1";
-        connection.query(sql, [data.user_id, data.sender_id], function (error, user) {  //user_id=receiver(audience) , sender_id=host (sender)
-            if (error) {
-                socketIO.to(socket_id).emit("get_messages_live_video", {error: true, messages: [], error_message: "Unauthorized user access.", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id});
-                socket.conn.close();
-            } else if (user && user.length > 0) {
-                if (user[0].user_id > 0) {
-                    job.getMessageLiveVideo(data.user_id, data.channel_name, data.sender_id, function (err, message_data) {
-                        if (!err) {
-                            socketIO.to(socket.id).emit("get_messages_live_video", {error: false, messages: message_data.message_list, channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id})  
-                        }
-                        else {
-                            socketIO.to(socket.id).emit("get_messages_live_video", {error: true, messages: [], error_message: "Error fetching the messages", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id})  
-                        }
-                    })
+        socket.on('authenticate_live_video_message', function (data) {
+            var sql = "SELECT * FROM app_login WHERE user_id = ? LIMIT 1";
+            connection.query(sql, [data.user_id, data.sender_id], function (error, user) {  //user_id=receiver(audience) , sender_id=host (sender)
+                if (error) {
+                    socketIO.to(socket_id).emit("get_messages_live_video", { error: true, messages: [], error_message: "Unauthorized user access.", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id });
+                    socket.conn.close();
+                } else if (user && user.length > 0) {
+                    if (user[0].user_id > 0) {
+                        job.getMessageLiveVideo(data.user_id, data.channel_name, data.sender_id, function (err, message_data) {
+                            if (!err) {
+                                socketIO.to(socket.id).emit("get_messages_live_video", { error: false, messages: message_data.message_list, channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id })
+                            }
+                            else {
+                                socketIO.to(socket.id).emit("get_messages_live_video", { error: true, messages: [], error_message: "Error fetching the messages", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id })
+                            }
+                        })
+                    } else {
+                        socketIO.to(socket_id).emit("get_messages_live_video", { error: true, messages: [], error_message: "Unauthorized user access.", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id });
+                        socket.conn.close();
+                    }
                 } else {
-                    socketIO.to(socket_id).emit("get_messages_live_video", {error: true, messages: [], error_message: "Unauthorized user access." ,channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id});
+                    console.log("Unauthorized");
+                    socketIO.to(socket_id).emit("get_messages_live_video", { error: true, messages: [], error_message: "Unauthorized user access.", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id });
                     socket.conn.close();
                 }
-            } else {
-                console.log("Unauthorized");
-                socketIO.to(socket_id).emit("get_messages_live_video", {error: true, messages: [], error_message: "Unauthorized user access.", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id});
-                socket.conn.close();
-            }
+            });
         });
-    });
 
-    socket.on('typing_live_video_message', function (data) {
-        socketIO.emit('typing_live_video_message', data);
-    });
+        socket.on('typing_live_video_message', function (data) {
+            socketIO.emit('typing_live_video_message', data);
+        });
 
-    // Insert live video messages socktes
-    socket.on('send_live_video_item', function (data) {
-        job.insertMessageLiveVideo(data, data.channel_name, function (err, message_data) {
-            if (err) {
-                console.log("error found ..., send_live_video_item", err);
-                // socketIO.emit("send_live_video_item", {message: null, error_message: "Something went wrong...", channel_name: data.channel_name})  
-            }
-            else {
-                socketIO.emit("send_live_video_item", {message: message_data.message, channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id})  
-            }
-        })
-    });
-
-    // Manage live video coins, time, views socktes
-    socket.on('live_video_manage_coins_time_views', function (data) {
-        job.manageCoinsTimeViewsLiveVideo(data, function (err, message_data) {
-            if (err) {
-                socketIO.emit("end_live_video_call_host_warning", data)   
-                console.log("error found ..., live_video_manage_coins_time_views", err);
-            }
-            else {
-                console.log(message_data, "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")
-                if (message_data.error == false && message_data.msg == "") {
-                    console.log(message_data+" successssssssssssss");
-                    socketIO.emit("live_video_manage_coins_time_views", message_data);  
+        // Insert live video messages socktes
+        socket.on('send_live_video_item', function (data) {
+            job.insertMessageLiveVideo(data, data.channel_name, function (err, message_data) {
+                if (err) {
+                    console.log("error found ..., send_live_video_item", err);
+                    // socketIO.emit("send_live_video_item", {message: null, error_message: "Something went wrong...", channel_name: data.channel_name})  
                 }
                 else {
-                    console.log(data+" erroorrrrrrrrrrrrrrr");
-                    socketIO.emit("end_live_video_call_audience_warning", message_data)
+                    socketIO.emit("send_live_video_item", { message: message_data.message, channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id })
                 }
-            
-            }
-        })
-    });
+            })
+        });
 
-    // Live video manage time socktes
-    socket.on('live_video_manage_time', function (data) {
-        let start_time = null;
-        startTimeLiveVideoCall.forEach((item, index) => {
-            if (data.channel_name == item.channel) {
-                start_time = item.start_time
-            }
-        })
-        if (start_time != null) {
-            var start = moment(start_time);
-            var end = moment(new Date().getTime());
-            var time = start.from(end);
-            data.time = time;
-            socketIO.emit("live_video_manage_time", data);
-        }   
-        else {
-            console.log(start_time, "wrong start time.....")
-        }
-    });
-
-
-    socket.on('live_video_manage_views', function (data) {
-        job.manageViewsLiveVideo(data, function (err, views) {
-            if (err) {
-                console.log("error found ..., live_video_manage_views", err);
-            }
-            else {
-                data.views = views;
-                 socketIO.emit("live_video_manage_views", data)
-            }
-        })
-    });
-
-/* one to one video call sockets */
-
-// one-to-one video manage time socktes
-socket.on('one_to_one_video_manage_time', function (data) {
-    let start_time = null;
-    startTimeOneToOneVideoCall.forEach((item, index) => {
-        if (data.channel_name == item.channel) {
-            start_time = item.start_time
-        }
-    })
-    if (start_time != null) {
-        var start = moment(start_time);
-        var end = moment(new Date().getTime());
-        var time = start.from(end);
-        data.time = time;
-        socketIO.emit("one_to_one_video_manage_time", data);
-    }   
-    else {
-        console.log(start_time, "wrong start time.....")
-    }
-});  // done
-
-
-// Manage one-to-one video coins, time, views socktes
-socket.on('one_to_one_video_manage_coins_time_views', function (data) {
-    job.manageCoinsTimeViewsOneToOneVideo(data, function (err, message_data) {
-        if (err) {
-            data.msg = "We are facing some technical issues. Please call after some time."
-            socketIO.emit("end_one_to_one_video_call_warning", data)   
-            console.log("error found ..., one_to_one_video_manage_coins_time_views", err);
-        }
-        else {
-            console.log(message_data, "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")
-            if (message_data.error == false && message_data.msg == "") {
-                console.log(message_data+" successssssssssssss");
-                socketIO.emit("one_to_one_video_manage_coins_time_views", message_data);  
-            }
-            else {
-                console.log(data+" erroorrrrrrrrrrrrrrr");
-                socketIO.emit("end_one_to_one_video_call_no_coin_warning", message_data)
-            }
-        
-        }
-    })
-}); // done
-
-socket.on('typing_one_to_one_video_message', function (data) {
-    socketIO.emit('typing_one_to_one_video_message', data);
-});  // done
-
-   socket.on('authenticate_one_to_one_video_message', function (data) {
-    var sql = "SELECT * FROM app_login WHERE user_id = ? LIMIT 1";
-    connection.query(sql, [data.user_id, data.sender_id], function (error, user) {  //user_id=receiver(audience) , sender_id=host (sender)
-        if (error) {
-            socketIO.to(socket_id).emit("get_messages_one_to_one_video", {error: true, messages: [], error_message: "Unauthorized user access.", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id});
-            socket.conn.close();
-        } else if (user && user.length > 0) {
-            if (user[0].user_id > 0) {
-                job.getMessageOneToOneVideo(data.user_id, data.channel_name, data.sender_id, function (err, message_data) {
-                    if (!err) {
-                        socketIO.to(socket.id).emit("get_messages_one_to_one_video", {error: false, messages: message_data.message_list, channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id})  
+        // Manage live video coins, time, views socktes
+        socket.on('live_video_manage_coins_time_views', function (data) {
+            job.manageCoinsTimeViewsLiveVideo(data, function (err, message_data) {
+                if (err) {
+                    socketIO.emit("end_live_video_call_host_warning", data)
+                    console.log("error found ..., live_video_manage_coins_time_views", err);
+                }
+                else {
+                    console.log(message_data, "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")
+                    if (message_data.error == false && message_data.msg == "") {
+                        console.log(message_data + " successssssssssssss");
+                        socketIO.emit("live_video_manage_coins_time_views", message_data);
                     }
                     else {
-                        socketIO.to(socket.id).emit("get_messages_one_to_one_video", {error: true, messages: [], error_message: "Error fetching the messages", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id})  
+                        console.log(data + " erroorrrrrrrrrrrrrrr");
+                        socketIO.emit("end_live_video_call_audience_warning", message_data)
                     }
-                })
-            } else {
-                socketIO.to(socket_id).emit("get_messages_one_to_one_video", {error: true, messages: [], error_message: "Unauthorized user access." ,channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id});
-                socket.conn.close();
-            }
-        } else {
-            console.log("Unauthorized");
-            socketIO.to(socket_id).emit("get_messages_one_to_one_video", {error: true, messages: [], error_message: "Unauthorized user access.", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id});
-            socket.conn.close();
-        }
-    });
-}); 
 
-// Insert one-to-one video messages socktes
-socket.on('send_one_to_one_video_item', function (data) {
-    job.insertMessageOneToOneVideo(data, data.channel_name, function (err, message_data) {
-        if (err) {
-            console.log("error found ..., send_live_video_item", err);
-            // socketIO.emit("send_live_video_item", {message: null, error_message: "Something went wrong...", channel_name: data.channel_name})  
-        }
-        else {
-            socketIO.emit("send_one_to_one_video_item", {message: message_data.message, channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id})  
-        }
-    })
-});
+                }
+            })
+        });
 
-/* one to one audio call sockets */
-
-// one-to-one audio manage time socktes
-socket.on('one_to_one_audio_manage_time', function (data) {
-    let start_time = null;
-    startTimeOneToOneAudioCall.forEach((item, index) => {
-        if (data.channel_name == item.channel) {
-            start_time = item.start_time
-        }
-    })
-    if (start_time != null) {
-        var start = moment(start_time);
-        var end = moment(new Date().getTime());
-        var time = start.from(end);
-        data.time = time;
-        socketIO.emit("one_to_one_audio_manage_time", data);
-    }   
-    else {
-        console.log(start_time, "wrong start time.....")
-    }
-});  // done
-
-
-// Manage one-to-one video coins, time, views socktes
-socket.on('one_to_one_audio_manage_coins_time_views', function (data) {
-    job.manageCoinsTimeViewsOneToOneAudio(data, function (err, message_data) {
-        if (err) {
-            data.msg = "We are facing some technical issues. Please call after some time."
-            socketIO.emit("end_one_to_one_audio_call_warning", data)   
-            console.log("error found ..., one_to_one_audio_manage_coins_time_views", err);
-        }
-        else {
-            console.log(message_data, "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")
-            if (message_data.error == false && message_data.msg == "") {
-                console.log(message_data+" successssssssssssss");
-                socketIO.emit("one_to_one_audio_manage_coins_time_views", message_data);  
+        // Live video manage time socktes
+        socket.on('live_video_manage_time', function (data) {
+            let start_time = null;
+            startTimeLiveVideoCall.forEach((item, index) => {
+                if (data.channel_name == item.channel) {
+                    start_time = item.start_time
+                }
+            })
+            if (start_time != null) {
+                var start = moment(start_time);
+                var end = moment(new Date().getTime());
+                var time = start.from(end);
+                data.time = time;
+                socketIO.emit("live_video_manage_time", data);
             }
             else {
-                console.log(data+" erroorrrrrrrrrrrrrrr");
-                socketIO.emit("end_one_to_one_audio_call_no_coin_warning", message_data)
+                console.log(start_time, "wrong start time.....")
             }
-        
-        }
+        });
+
+
+        socket.on('live_video_manage_views', function (data) {
+            job.manageViewsLiveVideo(data, function (err, views) {
+                if (err) {
+                    console.log("error found ..., live_video_manage_views", err);
+                }
+                else {
+                    data.views = views;
+                    socketIO.emit("live_video_manage_views", data)
+                }
+            })
+        });
+
+        /* one to one video call sockets */
+
+        // one-to-one video manage time socktes
+        socket.on('one_to_one_video_manage_time', function (data) {
+            let start_time = null;
+            startTimeOneToOneVideoCall.forEach((item, index) => {
+                if (data.channel_name == item.channel) {
+                    start_time = item.start_time
+                }
+            })
+            if (start_time != null) {
+                var start = moment(start_time);
+                var end = moment(new Date().getTime());
+                var time = start.from(end);
+                data.time = time;
+                socketIO.emit("one_to_one_video_manage_time", data);
+            }
+            else {
+                console.log(start_time, "wrong start time.....")
+            }
+        });  // done
+
+
+        // Manage one-to-one video coins, time, views socktes
+        socket.on('one_to_one_video_manage_coins_time_views', function (data) {
+            job.manageCoinsTimeViewsOneToOneVideo(data, function (err, message_data) {
+                if (err) {
+                    data.msg = "We are facing some technical issues. Please call after some time."
+                    socketIO.emit("end_one_to_one_video_call_warning", data)
+                    console.log("error found ..., one_to_one_video_manage_coins_time_views", err);
+                }
+                else {
+                    console.log(message_data, "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")
+                    if (message_data.error == false && message_data.msg == "") {
+                        console.log(message_data + " successssssssssssss");
+                        socketIO.emit("one_to_one_video_manage_coins_time_views", message_data);
+                    }
+                    else {
+                        console.log(data + " erroorrrrrrrrrrrrrrr");
+                        socketIO.emit("end_one_to_one_video_call_no_coin_warning", message_data)
+                    }
+
+                }
+            })
+        }); // done
+
+        socket.on('typing_one_to_one_video_message', function (data) {
+            socketIO.emit('typing_one_to_one_video_message', data);
+        });  // done
+
+        socket.on('authenticate_one_to_one_video_message', function (data) {
+            var sql = "SELECT * FROM app_login WHERE user_id = ? LIMIT 1";
+            connection.query(sql, [data.user_id, data.sender_id], function (error, user) {  //user_id=receiver(audience) , sender_id=host (sender)
+                if (error) {
+                    socketIO.to(socket_id).emit("get_messages_one_to_one_video", { error: true, messages: [], error_message: "Unauthorized user access.", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id });
+                    socket.conn.close();
+                } else if (user && user.length > 0) {
+                    if (user[0].user_id > 0) {
+                        job.getMessageOneToOneVideo(data.user_id, data.channel_name, data.sender_id, function (err, message_data) {
+                            if (!err) {
+                                socketIO.to(socket.id).emit("get_messages_one_to_one_video", { error: false, messages: message_data.message_list, channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id })
+                            }
+                            else {
+                                socketIO.to(socket.id).emit("get_messages_one_to_one_video", { error: true, messages: [], error_message: "Error fetching the messages", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id })
+                            }
+                        })
+                    } else {
+                        socketIO.to(socket_id).emit("get_messages_one_to_one_video", { error: true, messages: [], error_message: "Unauthorized user access.", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id });
+                        socket.conn.close();
+                    }
+                } else {
+                    console.log("Unauthorized");
+                    socketIO.to(socket_id).emit("get_messages_one_to_one_video", { error: true, messages: [], error_message: "Unauthorized user access.", channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id });
+                    socket.conn.close();
+                }
+            });
+        });
+
+        // Insert one-to-one video messages socktes
+        socket.on('send_one_to_one_video_item', function (data) {
+            job.insertMessageOneToOneVideo(data, data.channel_name, function (err, message_data) {
+                if (err) {
+                    console.log("error found ..., send_live_video_item", err);
+                    // socketIO.emit("send_live_video_item", {message: null, error_message: "Something went wrong...", channel_name: data.channel_name})  
+                }
+                else {
+                    socketIO.emit("send_one_to_one_video_item", { message: message_data.message, channel_name: data.channel_name, user_id: data.user_id, sender_id: data.sender_id })
+                }
+            })
+        });
+
+        /* one to one audio call sockets */
+
+        // one-to-one audio manage time socktes
+        socket.on('one_to_one_audio_manage_time', function (data) {
+            let start_time = null;
+            startTimeOneToOneAudioCall.forEach((item, index) => {
+                if (data.channel_name == item.channel) {
+                    start_time = item.start_time
+                }
+            })
+            if (start_time != null) {
+                var start = moment(start_time);
+                var end = moment(new Date().getTime());
+                var time = start.from(end);
+                data.time = time;
+                socketIO.emit("one_to_one_audio_manage_time", data);
+            }
+            else {
+                console.log(start_time, "wrong start time.....")
+            }
+        });  // done
+
+
+        // Manage one-to-one video coins, time, views socktes
+        socket.on('one_to_one_audio_manage_coins_time_views', function (data) {
+            job.manageCoinsTimeViewsOneToOneAudio(data, function (err, message_data) {
+                if (err) {
+                    data.msg = "We are facing some technical issues. Please call after some time."
+                    socketIO.emit("end_one_to_one_audio_call_warning", data)
+                    console.log("error found ..., one_to_one_audio_manage_coins_time_views", err);
+                }
+                else {
+                    console.log(message_data, "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")
+                    if (message_data.error == false && message_data.msg == "") {
+                        console.log(message_data + " successssssssssssss");
+                        socketIO.emit("one_to_one_audio_manage_coins_time_views", message_data); ``
+                    }
+                    else {
+                        console.log(data + " erroorrrrrrrrrrrrrrr");
+                        socketIO.emit("end_one_to_one_audio_call_no_coin_warning", message_data)
+                    }
+
+                }
+            })
+        }); // done
+
+        socket.on('get_frds_last_messages', function (data) {
+            job.getFrdsLastMessage(data, function (err, message_data) {
+                if (message_data) {
+                    socketIO.emit("get_frds_last_messages", message_data)
+                } else {
+                    console.log('hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhdata not emit');
+                }
+            })
+        })
+
     })
-}); // done
-})
 }
-
-
